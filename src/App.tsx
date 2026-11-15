@@ -262,6 +262,14 @@ export default function App() {
 
       <main className="stage">
         <Viewport />
+      {build && <ServerProperties
+        source={serverSource}
+        mode={serverMode}
+        onSaved={(entry) => {
+          setServerSource(entry);
+          setServerMode("editar");
+        }}
+      />}
         {build ? (
           <>
             <LayerSlider />
@@ -290,14 +298,7 @@ export default function App() {
       </main>
 
       {build && <MaterialPanel />}
-      {build && <ServerProperties
-        source={serverSource}
-        mode={serverMode}
-        onSaved={(entry) => {
-          setServerSource(entry);
-          setServerMode("editar");
-        }}
-      />}
+
       <StatusBar />
     </div>
   );
