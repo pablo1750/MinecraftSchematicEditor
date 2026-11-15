@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { translate, useLocale } from "../i18n";
 import { ALL_COMMON_BLOCKS, BLOCK_GROUPS } from "../core/commonBlocks";
 import { groupBlocks } from "../core/blockCatalog";
 import { cssColor } from "../core/blockLook";
@@ -17,6 +18,7 @@ interface Props {
  * so `oak_stairs[facing=east,half=top]` works, not just plain ids.
  */
 export function BlockPicker({ title, onPick, onClose }: Props) {
+  const locale = useLocale();
   const [query, setQuery] = useState("");
   const build = useStore((s) => s.build);
   const revision = useStore((s) => s.revision);
@@ -82,12 +84,19 @@ export function BlockPicker({ title, onPick, onClose }: Props) {
       ...catalogue,
       ...modCatalogue,
     ];
-    const needle = query.trim().toLowerCase().replace(/\s+/g, "_");
+    const search = query.trim().toLocaleLowerCase();
+    const needle = search.replace(/\s+/g, "_");
     if (!needle) return all;
     return all
-      .map((group) => ({ name: group.name, blocks: group.blocks.filter((id) => id.includes(needle)) }))
+      .map((group) => ({
+        name: group.name,
+        blocks: group.blocks.filter((id) =>
+          id.toLowerCase().includes(needle) ||
+          displayName({ name: id }).toLocaleLowerCase().includes(search)
+        ),
+      }))
       .filter((group) => group.blocks.length > 0);
-  }, [query, inBuild, catalogue, modCatalogue]);
+  }, [query, inBuild, catalogue, modCatalogue, locale]);
 
   const typed = query.trim();
   const custom = typed && !typed.includes(" ") ? parseStateKey(normalizeName(typed)) : null;
@@ -125,7 +134,7 @@ export function BlockPicker({ title, onPick, onClose }: Props) {
 
           {groups.map((group) => (
             <div className="picker-group" key={group.name}>
-              <div className="eyebrow">{group.name}</div>
+              <div className="eyebrow">{translate(group.name)}</div>
               <div className="picker-grid">
                 {group.blocks.map((id) => (
                   <BlockButton key={group.name + id} state={{ name: id }} onPick={onPick} />
