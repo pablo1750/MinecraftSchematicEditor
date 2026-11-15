@@ -1,9 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { localizationPlugin } from "./scripts/localization-plugin";
 import { minecraftAssets } from "./scripts/minecraft-assets-plugin";
 
 export default defineConfig({
-  plugins: [react(), minecraftAssets()],
+  plugins: [localizationPlugin(), react(), minecraftAssets()],
   // GitHub Pages serves a project site from /<repo>/, not from the root, so
   // every asset URL needs that prefix baked in. The deploy workflow passes the
   // repository's own name, which keeps working if the repo is ever renamed.
