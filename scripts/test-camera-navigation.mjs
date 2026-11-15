@@ -3,14 +3,13 @@ import { readFileSync } from "node:fs";
 import { createServer } from "vite";
 
 const viewer = readFileSync("src/render/Viewer.ts", "utf8");
-assert.match(viewer, /this\.controls\.enableZoom\s*=\s*false;/);
 assert.match(viewer, /this\.onNavigationWheel/);
 assert.match(viewer, /this\.translateView\(direction\.multiplyScalar\(travel\)\)/);
-assert.match(viewer, /this\.orbitPointer\?\.id === event\.pointerId/);
-assert.match(viewer, /orbitAroundAnchor\(this\.camera, this\.controls\.target, this\.orbitAnchor/);
-assert.match(viewer, /this\.translateView\(offset, true\)/);
-assert.match(viewer, /this\.orbi[t]Anchor\.copy\(center\)/);
+assert.match(viewer, /this\.translateView\(offset\)/);
 assert.match(viewer, /this\.panPointer\?\.id === event\.pointerId/);
+assert.match(viewer, /this\.rotatePointer\?\.id === event\.pointerId/);
+assert.match(viewer, /rotateCameraInPlace\(this\.camera, dx, dy\)/);
+assert.doesNotMatch(viewer, /orbitAroundAnchor|this\.orbitAnchor/);
 
 const server = await createServer({ configFile: false, server: { middlewareMode: true }, appType: "custom" });
 try {
@@ -44,7 +43,7 @@ try {
     outTotal += -result.travel;
   }
   assert.ok(outTotal > 20, "El zoom out debe seguir funcionando");
-  console.log("OK: zoom continuo y reversible, pan y zoom con piso del 10%, controles orbitales intactos.");
+  console.log("OK: zoom continuo y reversible, pan y zoom con piso del 10%, navegación única sin giro orbital.");
 } finally {
   await server.close();
 }
