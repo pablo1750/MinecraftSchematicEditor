@@ -43,6 +43,9 @@ jobs:
       - name: Test camera zoom and pan navigation
         run: node scripts/test-camera-navigation.mjs
 
+      - name: Test orbital rotation after off-center zoom
+        run: node scripts/test-camera-orbit-after-zoom.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
