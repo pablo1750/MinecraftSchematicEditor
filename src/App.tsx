@@ -59,6 +59,7 @@ export default function App() {
   const [serverSource, setServerSource] = useState<ConstruccionServidor | null>(null);
   const [serverLoadedFile, setServerLoadedFile] = useState<string | null>(null);
   const [serverMode, setServerMode] = useState<ModoGuardar>("nueva");
+  const [propertiesVisible, setPropertiesVisible] = useState(true);
   const [dragging, setDragging] = useState(false);
   // Dropping a file replaces the build, which is the wrong answer when you
   // meant to bring a design *into* it, or to work on it beside this one. Shift
@@ -258,13 +259,15 @@ export default function App() {
         else store.openAny(file);
       }}
     >
-      <TopBar />
+      <TopBar propertiesVisible={propertiesVisible} onToggleProperties={() => setPropertiesVisible((visible) => !visible)} />
       <DocTabs />
       {build && <ToolRail />}
 
       <main className="stage">
         <Viewport />
       {build && <ServerProperties
+        visible={propertiesVisible}
+        onClose={() => setPropertiesVisible(false)}
         source={serverLoadedFile !== null && fileName === serverLoadedFile ? serverSource : null}
         mode={serverLoadedFile !== null && fileName === serverLoadedFile ? serverMode : "nueva"}
         onSaved={(entry) => {
