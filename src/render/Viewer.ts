@@ -29,7 +29,7 @@ const CHUNK = 32;
 /** Milliseconds of meshing allowed per frame, so the camera never stutters. */
 const MESH_BUDGET_MS = 10;
 
-export type CameraMode = "orbit" | "fly";
+export type CameraMode = "orbit" | "look" | "fly";
 
 /** An inclusive block range, as the overlays want it. */
 export interface Box {
@@ -234,6 +234,8 @@ export class Viewer {
   private clipLift = 0;
 
   private mode: CameraMode = "orbit";
+  /** Pointer used only for rotating the view in place (never editing). */
+  private lookPointer: { id: number; x: number; y: number } | null = null;
   private keys = new Set<string>();
   private flySpeed = 12;
   private lastFrame = performance.now();
@@ -1302,6 +1304,20 @@ export class Viewer {
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    if (this.mode === "look" && this.lookPointer?.id === event.pointerId) {
+      const dx = event.clientX - this.lookPointer.x;
+      const dy = event.clientY - this.lookPointer.y;
+      this.lookPointer.x = event.clientX;
+      this.lookPointer.y = event.clientY;
+      // Same yaw/pitch convention as fly mode, but the camera does not move.
+      this.euler.setFromQuaternion(this.camera.quaternion, "YXZ");
+      this.euler.y -= dx * 0.0022;
+      this.euler.x -= dy * 0.0022;
+      this.euler.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this.euler.x));
+      this.camera.quaternion.setFromEuler(this.euler);
+      return;
+    }
+    if (this.mode === "look") return;
     if (this.mode === "fly" && document.pointerLockElement === this.renderer.domElement) {
       this.euler.setFromQuaternion(this.camera.quaternion);
       this.euler.y -= event.movementX * 0.0022;
@@ -1324,6 +1340,11 @@ export class Viewer {
 
   private onPointerDown = (event: PointerEvent) => {
     if (event.button !== 0) return;
+    if (this.mode === "look") {
+      this.lookPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      try { this.renderer.domElement.setPointerCapture(event.pointerId); } catch { /* optional */ }
+      return;
+    }
     if (this.mode === "fly") {
       // Denied pointer lock is fine — WASD still works, only mouse-look stops.
       Promise.resolve(this.renderer.domElement.requestPointerLock()).catch(() => {});
@@ -1351,6 +1372,13 @@ export class Viewer {
   };
 
   private onPointerUp = (event: PointerEvent) => {
+    if (this.lookPointer?.id === event.pointerId) {
+      this.lookPointer = null;
+      if (this.renderer.domElement.hasPointerCapture(event.pointerId)) {
+        this.renderer.domElement.releasePointerCapture(event.pointerId);
+      }
+      return;
+    }
     if (this.marqueeStart) {
       this.finishMarquee(this.localPoint(event));
       return;
@@ -1361,6 +1389,7 @@ export class Viewer {
   };
 
   private onPointerLeave = () => {
+    if (this.mode === "look") return;
     // A captured marquee drag is meant to run past the edge.
     if (this.marqueeStart) return;
     if (this.painting) {
@@ -1669,6 +1698,7 @@ export class Viewer {
   setCameraMode(mode: CameraMode) {
     if (mode === this.mode) return;
     this.mode = mode;
+    this.lookPointer = null;
     this.controls.enabled = mode === "orbit";
     if (mode === "orbit") {
       document.exitPointerLock?.();
