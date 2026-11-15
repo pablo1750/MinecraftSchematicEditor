@@ -141,6 +141,16 @@ function ringGeometry(radius: number, segments = 48): THREE.BufferGeometry {
 export class Viewer {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
+  /**
+   * Captura de la vista WebGL actual, sin menús ni overlays HTML.
+   * Renderizar inmediatamente antes de leer los píxeles evita una captura
+   * vacía cuando preserveDrawingBuffer está deshabilitado.
+   */
+  takePhoto(): string {
+    this.renderer.render(this.scene, this.camera);
+    return this.renderer.domElement.toDataURL("image/png");
+  }
+
   private renderer: THREE.WebGLRenderer;
   private labelRenderer: CSS2DRenderer;
   private controls: OrbitControls;
