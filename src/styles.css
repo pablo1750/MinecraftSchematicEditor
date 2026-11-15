@@ -1781,3 +1781,26 @@ kbd {
 .server-properties-close:focus-visible {
   background: var(--raise);
 }
+
+/* Selector de idioma: compacto también en tablets. */
+.language-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--mute);
+}
+.language-control select {
+  color: var(--chalk);
+  background: var(--slate);
+  border: 1px solid var(--line);
+  padding: 6px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  max-width: 140px;
+}
+@media (max-width: 900px) {
+  .language-control span { display: none; }
+  .language-control select { max-width: 112px; }
+}
