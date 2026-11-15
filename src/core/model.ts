@@ -1,3 +1,4 @@
+import { translateBlock, translateProperty } from "../i18n";
 /**
  * The editor's internal build representation. Every loader converts into this
  * and every exporter converts out of it, so the viewer and the tools only ever
@@ -314,10 +315,11 @@ export function baseName(name: string): string {
 
 /** Human label: `minecraft:oak_stairs` -> `Oak Stairs`. */
 export function displayName(state: BlockState): string {
-  return baseName(state.name)
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+  return translateBlock(state.name) ??
+    baseName(state.name)
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
 }
 
 /** Short property summary for the material list, e.g. `north · top`. */
@@ -327,7 +329,7 @@ export function propertySummary(state: BlockState): string {
   const skip = new Set(["waterlogged", "powered", "lit", "open", "occupied"]);
   const parts = Object.keys(props)
     .filter((k) => !skip.has(k))
-    .map((k) => props[k])
+    .map((k) => translateProperty(props[k]))
     .filter((v) => v !== "false" && v !== "none");
   return parts.join(" · ");
 }
