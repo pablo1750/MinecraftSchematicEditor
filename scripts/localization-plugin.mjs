@@ -33,7 +33,7 @@ export function localizationPlugin() {
       // Se procesa por texto completo entre tags: cualquier sección con JSX
       // dinámico se deja tal cual para no intervenir en lógica condicional.
       code = code.replace(jsxText, (original, value) => {
-        if (!Object.hasOwn(dictionary, value.trim())) return original;
+        if (!Object.hasOwn(dictionary, value.trim().replace(/\\s+/g, " "))) return original;
         replacements++;
         return ">{__trText(" + JSON.stringify(value) + ")}<";
       });
