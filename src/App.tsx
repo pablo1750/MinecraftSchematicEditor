@@ -9,6 +9,8 @@ import { MaterialPanel } from "./ui/MaterialPanel";
 import { StatusBar } from "./ui/StatusBar";
 import { LayerSlider } from "./ui/LayerSlider";
 import { EmptyState } from "./ui/EmptyState";
+import { ServerProperties } from "./ui/ServerProperties";
+import type { ConstruccionServidor, ModoGuardar } from "./server/catalog";
 import { Hotbar } from "./ui/Hotbar";
 import { toggleSection, useSectionOpen } from "./ui/Section";
 
@@ -53,6 +55,8 @@ function gridStep(
 
 export default function App() {
   const build = useStore((s) => s.build);
+  const [serverSource, setServerSource] = useState<ConstruccionServidor | null>(null);
+  const [serverMode, setServerMode] = useState<ModoGuardar>("nueva");
   const [dragging, setDragging] = useState(false);
   // Dropping a file replaces the build, which is the wrong answer when you
   // meant to bring a design *into* it, or to work on it beside this one. Shift
@@ -266,7 +270,10 @@ export default function App() {
             <BusyIndicator />
           </>
         ) : (
-          <EmptyState />
+          <EmptyState onServerOpen={(entry, mode) => {
+            setServerSource(entry);
+            setServerMode(mode);
+          }} />
         )}
         <Notice />
         {dragging && (
@@ -283,6 +290,14 @@ export default function App() {
       </main>
 
       {build && <MaterialPanel />}
+      {build && <ServerProperties
+        source={serverSource}
+        mode={serverMode}
+        onSaved={(entry) => {
+          setServerSource(entry);
+          setServerMode("editar");
+        }}
+      />}
       <StatusBar />
     </div>
   );
