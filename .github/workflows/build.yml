@@ -92,7 +92,7 @@ jobs:
           chmod 700 "$HOME/.ssh"
           printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
-          printf '%s\\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
           echo "DEPLOY_TARGET=$DEPLOY_USER@$DEPLOY_HOST" >> "$GITHUB_ENV"
           echo "DEPLOY_PORT=$DEPLOY_PORT" >> "$GITHUB_ENV"
