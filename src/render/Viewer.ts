@@ -1362,13 +1362,16 @@ export class Viewer {
   private painting = false;
 
   private onPointerDown = (event: PointerEvent) => {
-    if (event.button === 1 || (!this.editing && event.button === 0)) {
+    // Giro siempre con el botón derecho. El izquierdo desplaza solo cuando
+    // no hay una herramienta editando; en edición conserva su acción sobre
+    // bloques y el botón central permite desplazar la vista.
+    if (event.button === 2) {
       event.preventDefault();
       this.rotatePointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
       try { this.renderer.domElement.setPointerCapture(event.pointerId); } catch { /* optional */ }
       return;
     }
-    if (event.button === 2) {
+    if (event.button === 1 || (!this.editing && event.button === 0)) {
       event.preventDefault();
       this.panPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
       try { this.renderer.domElement.setPointerCapture(event.pointerId); } catch { /* optional */ }
