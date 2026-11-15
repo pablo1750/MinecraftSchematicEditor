@@ -1,13 +1,11 @@
 import { useStore } from "../store";
 import { translate } from "../i18n";
-import { IconFly, IconFrame, IconOrbit } from "./icons";
+import { IconFrame } from "./icons";
 import { TOOLS } from "./tools";
 
 export function ToolRail() {
   const tool = useStore((s) => s.tool);
   const setTool = useStore((s) => s.setTool);
-  const cameraMode = useStore((s) => s.cameraMode);
-  const setCameraMode = useStore((s) => s.setCameraMode);
   const clip = useStore((s) => s.clip);
 
   return (
@@ -28,38 +26,6 @@ export function ToolRail() {
       ))}
 
       <div className="rail-divider" />
-
-      <button
-        className="rail-btn"
-        data-active={cameraMode === "orbit"}
-        onClick={() => setCameraMode("orbit")}
-        title="Orbit around the build  (O)"
-        aria-pressed={cameraMode === "orbit"}
-      >
-        <IconOrbit size={18} />
-        <span className="rail-key">O</span>
-      </button>
-      <button
-        className="rail-btn"
-        data-active={cameraMode === "look"}
-        onClick={() => setCameraMode("look")}
-        title={translate("Girar desde la cámara — arrastrá para mirar sin desplazarte")}
-        aria-label={translate("Girar desde la cámara")}
-        aria-pressed={cameraMode === "look"}
-      >
-        <IconOrbit size={18} />
-        <span className="rail-key">◎</span>
-      </button>
-      <button
-        className="rail-btn"
-        data-active={cameraMode === "fly"}
-        onClick={() => setCameraMode("fly")}
-        title="Walk through the build — click to look, WASD to move  (G)"
-        aria-pressed={cameraMode === "fly"}
-      >
-        <IconFly size={18} />
-        <span className="rail-key">G</span>
-      </button>
 
       <div className="rail-divider" />
 
