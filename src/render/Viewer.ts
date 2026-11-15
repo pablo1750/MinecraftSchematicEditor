@@ -11,7 +11,7 @@ import type { Build } from "../core/model";
 import type { BrushShape } from "../core/brush";
 import { mirrorImages, planePosition, type MirrorConfig } from "../core/mirror";
 import { meshRegion, type MeshData } from "./mesher";
-import { panUnitsPerPixel, zoomAdvance } from "./cameraNavigation";
+import { orbitAroundAnchor, panUnitsPerPixel, zoomAdvance } from "./cameraNavigation";
 import type { BakedPalette } from "./bake";
 
 // Colours here mirror the CSS tokens in styles.css.
@@ -239,6 +239,9 @@ export class Viewer {
   private lookPointer: { id: number; x: number; y: number } | null = null;
   /** Desplazamiento con botón derecho, independiente de OrbitControls. */
   private panPointer: { id: number; x: number; y: number } | null = null;
+  /** El zoom puede mover el target visual, pero no el centro del giro orbital. */
+  private orbitAnchor = new THREE.Vector3();
+  private orbitPointer: { id: number; x: number; y: number } | null = null;
   /** Distancia inicial de encuadre y escala actual, con piso de 25%. */
   private navigationReference = 16;
   private navigationScale = 16;
@@ -288,6 +291,9 @@ export class Viewer {
     // La rueda utiliza una traslación hacia el cursor, con una velocidad
     // mínima. El dolly nativo se frena al acercarse a su pivote.
     this.controls.enableZoom = false;
+    // Mouse orbital propio: gira alrededor del ancla estable aun después de
+    // trasladar la vista hacia un cursor alejado del centro.
+    this.controls.mouseButtons = { LEFT: undefined, MIDDLE: undefined, RIGHT: undefined };
     // Evitar distancia ~0: el zoom exponencial pierde recorrido y puede
     // aparentar que tanto acercar como alejar dejaron de funcionar.
     this.controls.minDistance = 0.25;
@@ -1319,6 +1325,15 @@ export class Viewer {
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    if (this.mode === "orbit" && this.orbitPointer?.id === event.pointerId) {
+      const dx = event.clientX - this.orbitPointer.x;
+      const dy = event.clientY - this.orbitPointer.y;
+      this.orbitPointer.x = event.clientX;
+      this.orbitPointer.y = event.clientY;
+      orbitAroundAnchor(this.camera, this.controls.target, this.orbitAnchor, dx, dy, rect.height);
+      this.controls.update();
+      return;
+    }
     if (this.mode === "orbit" && this.panPointer?.id === event.pointerId) {
       const dx = event.clientX - this.panPointer.x;
       const dy = event.clientY - this.panPointer.y;
@@ -1329,7 +1344,7 @@ export class Viewer {
       const horizontal = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
       const vertical = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
       const offset = horizontal.multiplyScalar(-dx * amount).add(vertical.multiplyScalar(dy * amount));
-      this.translateView(offset);
+      this.translateView(offset, true);
       return;
     }
     if (this.mode === "look" && this.lookPointer?.id === event.pointerId) {
@@ -1366,10 +1381,11 @@ export class Viewer {
 
   private preventCanvasMenu = (event: MouseEvent) => event.preventDefault();
 
-  /** Traslada cámara y pivote juntos, sin cambiar el ángulo orbital. */
-  private translateView(offset: THREE.Vector3) {
+  /** Zoom mueve cámara+target sin desplazar el ancla orbital; pan mueve los tres. */
+  private translateView(offset: THREE.Vector3, moveOrbitAnchor = false) {
     this.camera.position.add(offset);
     this.controls.target.add(offset);
+    if (moveOrbitAnchor) this.orbitAnchor.add(offset);
     this.controls.update();
   }
 
@@ -1397,6 +1413,12 @@ export class Viewer {
   private painting = false;
 
   private onPointerDown = (event: PointerEvent) => {
+    if (this.mode === "orbit" && (event.button === 1 || (!this.editing && event.button === 0))) {
+      event.preventDefault();
+      this.orbitPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      try { this.renderer.domElement.setPointerCapture(event.pointerId); } catch { /* optional */ }
+      return;
+    }
     if (this.mode === "orbit" && event.button === 2) {
       event.preventDefault();
       this.panPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
@@ -1436,6 +1458,13 @@ export class Viewer {
   };
 
   private onPointerUp = (event: PointerEvent) => {
+    if (this.orbitPointer?.id === event.pointerId) {
+      this.orbitPointer = null;
+      if (this.renderer.domElement.hasPointerCapture(event.pointerId)) {
+        this.renderer.domElement.releasePointerCapture(event.pointerId);
+      }
+      return;
+    }
     if (this.panPointer?.id === event.pointerId) {
       this.panPointer = null;
       if (this.renderer.domElement.hasPointerCapture(event.pointerId)) {
@@ -1460,7 +1489,7 @@ export class Viewer {
   };
 
   private onPointerLeave = () => {
-    if (this.mode === "look" || this.panPointer) return;
+    if (this.mode === "look" || this.panPointer || this.orbitPointer) return;
     // A captured marquee drag is meant to run past the edge.
     if (this.marqueeStart) return;
     if (this.painting) {
@@ -1757,9 +1786,9 @@ export class Viewer {
    */
   setEditing(editing: boolean) {
     this.editing = editing;
-    this.controls.mouseButtons = editing
-      ? { LEFT: undefined, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: undefined }
-      : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: undefined };
+    // Los gestos táctiles siguen delegados a OrbitControls. El mouse se
+    // gestiona aquí para que giro, zoom y pan usen referencias compatibles.
+    this.controls.mouseButtons = { LEFT: undefined, MIDDLE: undefined, RIGHT: undefined };
     if (!editing) {
       this.hoverBox.visible = false;
       this.showMirrorCursors(null);
@@ -1776,6 +1805,7 @@ export class Viewer {
     this.mode = mode;
     this.lookPointer = null;
     this.panPointer = null;
+    this.orbitPointer = null;
     this.controls.enabled = mode === "orbit";
     if (mode === "orbit") {
       document.exitPointerLock?.();
@@ -1783,6 +1813,7 @@ export class Viewer {
         this.camera.position.clone().add(this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(16)),
       );
       this.controls.update();
+      this.orbitAnchor.copy(this.controls.target);
     }
     this.hoverBox.visible = false;
     this.movePushCursor(null);
@@ -1801,6 +1832,7 @@ export class Viewer {
       center.z + distance * 0.85,
     );
     this.controls.target.copy(center);
+    this.orbitAnchor.copy(center);
     this.camera.lookAt(center);
     this.controls.update();
     this.navigationReference = this.camera.position.distanceTo(this.controls.target);
