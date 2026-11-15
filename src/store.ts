@@ -150,7 +150,7 @@ interface State {
   notice: string | null;
 
   tool: Tool;
-  cameraMode: "orbit" | "fly";
+  cameraMode: "orbit" | "look" | "fly";
   layerLimit: number;
   /** Highlighted in the viewport and targeted by the material actions. */
   selectedMaterial: number | null;
@@ -382,7 +382,7 @@ interface Actions {
   flushAutosave: () => void;
 
   setTool: (tool: Tool) => void;
-  setCameraMode: (mode: "orbit" | "fly") => void;
+  setCameraMode: (mode: "orbit" | "look" | "fly") => void;
   frameBuild: () => void;
   setLayerLimit: (y: number) => void;
   selectMaterial: (paletteIndex: number | null) => void;
