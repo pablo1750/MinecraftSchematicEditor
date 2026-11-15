@@ -276,6 +276,12 @@ export class Viewer {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.screenSpacePanning = true;
+    // Zoom hacia el cursor, no hacia un pivote fijo que termina atrapando
+    // la cámara al aproximarse al centro de una construcción grande.
+    this.controls.zoomToCursor = true;
+    // Evitar distancia ~0: el zoom exponencial pierde recorrido y puede
+    // aparentar que tanto acercar como alejar dejaron de funcionar.
+    this.controls.minDistance = 0.25;
     this.controls.maxDistance = 2000;
 
     this.scene.fog = new THREE.Fog(0x0d1117, 220, 900);
@@ -1676,13 +1682,14 @@ export class Viewer {
   }
 
   /**
-   * With an edit tool active, left-drag belongs to the tool, so orbiting moves
-   * to the right button and panning to the middle one.
+   * El botón derecho desplaza la cámara siempre que se usa OrbitControls.
+   * Si hay una herramienta activa, el izquierdo edita y el central orbita;
+   * sin herramienta, el izquierdo orbita normalmente.
    */
   setEditing(editing: boolean) {
     this.editing = editing;
     this.controls.mouseButtons = editing
-      ? { LEFT: undefined, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE }
+      ? { LEFT: undefined, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN }
       : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
     if (!editing) {
       this.hoverBox.visible = false;
