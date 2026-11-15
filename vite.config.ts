@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { localizationPlugin } from "./scripts/localization-plugin";
+import { localizationPlugin } from "./scripts/localization-plugin.mjs";
 import { minecraftAssets } from "./scripts/minecraft-assets-plugin";
 
 export default defineConfig({
