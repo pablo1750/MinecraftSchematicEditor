@@ -84,7 +84,7 @@ export async function guardarConstruccion(
   }
   const blob = await saveBuild(build, "schem");
   form.set("archivo", blob, "construction.schem");
-  if (photo) form.set("imagen", photo, "photo.png");
+  if (photo) form.set("imagen", photo, photo.type === "image/webp" ? "photo.webp" : "photo.png");
   const response = await fetch("/api/construcciones?accion=editor_guardar", {
     method: "POST", body: form, credentials: "same-origin",
   });
