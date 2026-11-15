@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { setLocale, useLocale } from "../i18n";
 import { useStore } from "../store";
 import { ACCEPTED_EXTENSIONS, type SaveFormat } from "../formats";
 import {
@@ -15,6 +16,7 @@ const SAVE_FORMATS: { id: SaveFormat; label: string }[] = [
 ];
 
 export function TopBar({ propertiesVisible, onToggleProperties }: { propertiesVisible: boolean; onToggleProperties: () => void }) {
+  const locale = useLocale();
   const build = useStore((s) => s.build);
   const fileName = useStore((s) => s.fileName);
   const undoStack = useStore((s) => s.undoStack);
@@ -99,6 +101,14 @@ export function TopBar({ propertiesVisible, onToggleProperties }: { propertiesVi
           Propiedades
         </button>
       )}
+      <label className="language-control" title="Idioma / Language">
+        <span>{locale === "es-AR" ? "Idioma" : "Language"}</span>
+        <select aria-label="Idioma / Language" value={locale}
+          onChange={(event) => setLocale(event.target.value as "es-AR" | "en-US")}>
+          <option value="es-AR">Español (AR)</option>
+          <option value="en-US">English</option>
+        </select>
+      </label>
       <TexturePack />
       <ModPacks />
 
