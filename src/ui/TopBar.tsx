@@ -3,7 +3,7 @@ import { setLocale, useLocale } from "../i18n";
 import { useStore } from "../store";
 import { ACCEPTED_EXTENSIONS, type SaveFormat } from "../formats";
 import {
-  IconClose, IconDownload, IconImport, IconOpen, IconRedo, IconUndo, Mark,
+  IconClose, IconDownload, IconImport, IconOpen, IconRedo, IconSave, IconUndo, Mark,
 } from "./icons";
 import { TexturePack } from "./TexturePack";
 import { ModPacks } from "./ModPacks";
@@ -15,7 +15,7 @@ const SAVE_FORMATS: { id: SaveFormat; label: string }[] = [
   { id: "nbt", label: "Structure" },
 ];
 
-export function TopBar({ propertiesVisible, onToggleProperties }: { propertiesVisible: boolean; onToggleProperties: () => void }) {
+export function TopBar({ propertiesVisible, onToggleProperties, onSave }: { propertiesVisible: boolean; onToggleProperties: () => void; onSave: () => void }) {
   const locale = useLocale();
   const build = useStore((s) => s.build);
   const fileName = useStore((s) => s.fileName);
@@ -94,6 +94,12 @@ export function TopBar({ propertiesVisible, onToggleProperties }: { propertiesVi
 
       <span className="topbar-spacer" />
 
+      {build && (
+        <button className="btn btn-primary" type="button" onClick={onSave}
+          title="Guardar construcción en el servidor" aria-label="Guardar construcción">
+          <IconSave /> Guardar
+        </button>
+      )}
       {build && (
         <button className="btn btn-outline" type="button" onClick={onToggleProperties}
           aria-pressed={propertiesVisible} aria-controls="server-properties-panel"
