@@ -118,7 +118,6 @@ export default function App() {
         if (store.pasteLift !== 0) return store.setPasteLift(0);
         if (store.stairsFrom) return store.clearStairs();
         store.clearRegion();
-        store.setCameraMode("orbit");
         return;
       }
       if (!store.build) return;
@@ -188,15 +187,15 @@ export default function App() {
       }
 
       if (event.code === "KeyL") return store.setPlaneLock(!store.planeLock);
-      // R turns the clip a quarter turn — except in fly mode, where it sprints.
-      if (event.code === "KeyR" && store.tool === "clone" && store.cameraMode !== "fly") {
+      // R rotates the copied selection or the paint block.
+      if (event.code === "KeyR" && store.tool === "clone") {
         return store.rotateClip();
       }
       // With a block tool in hand the same key turns the paint material itself,
       // so a stair or a log is aimed without a trip through the picker; Shift
       // turns it over.
       if (
-        event.code === "KeyR" && store.cameraMode !== "fly" &&
+        event.code === "KeyR" &&
         (store.tool === "place" || store.tool === "paint" || store.tool === "floor")
       ) {
         return event.shiftKey ? store.flipPaint() : store.turnPaint();
@@ -206,12 +205,7 @@ export default function App() {
         return store.setPasteOverwrite(!store.pasteOverwrite);
       }
       const tool = TOOL_KEYS[event.code];
-      // S is also fly mode's "back up" key, so it only picks a tool on the ground.
-      if (tool && !(event.code === "KeyS" && store.cameraMode === "fly")) {
-        return store.setTool(tool);
-      }
-      if (event.code === "KeyO") return store.setCameraMode("orbit");
-      if (event.code === "KeyG") return store.setCameraMode("fly");
+      if (tool) return store.setTool(tool);
       if (event.code === "KeyF") return store.frameBuild();
       if (event.code === "Delete" || event.code === "Backspace") {
         if (store.region) store.eraseRegion();
@@ -391,7 +385,6 @@ function Notice() {
 
 function StageHud() {
   const tool = useStore((s) => s.tool);
-  const cameraMode = useStore((s) => s.cameraMode);
   const region = useStore((s) => s.region);
   const anchor = useStore((s) => s.regionAnchor);
   const clip = useStore((s) => s.clip);
@@ -434,19 +427,12 @@ function StageHud() {
   // left up they cover the bottom of the build, which is where the ground is.
   return (
     <div className="stage-hud">
-      {cameraMode === "look" ? (
-        <div className="hint">Girar desde la cámara · arrastrá para mirar sin mover tu posición</div>
-      ) : cameraMode === "fly" ? (
-        <div className="hint">
-          Click the view to look around · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move ·{" "}
-          <kbd>Space</kbd>/<kbd>Shift</kbd> up and down · <kbd>R</kbd> sprint · <kbd>Esc</kbd> back to orbit
-        </div>
-      ) : tool === "move" ? (
-        <div className="hint">Drag to orbit · right-drag to pan · scroll to zoom at cursor</div>
+      {tool === "move" ? (
+        <div className="hint">Arrastrá para girar desde la cámara · clic derecho para desplazar · rueda para zoom</div>
       ) : (
-        <div className="hint">Middle-drag to orbit · right-drag to pan · scroll to zoom at cursor</div>
+        <div className="hint">Botón central para girar desde la cámara · clic derecho para desplazar · rueda para zoom</div>
       )}
-      {cameraMode !== "look" && toolHint && <div className="hint">{translate(toolHint)}</div>}
+      {toolHint && <div className="hint">{translate(toolHint)}</div>}
 
       {keys && (
         <>
