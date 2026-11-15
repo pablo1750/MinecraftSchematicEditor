@@ -1,9 +1,9 @@
 /**
  * Navegación de cámara independiente de la distancia mínima de OrbitControls.
  * La escala disminuye normalmente al acercarse, pero nunca cae por debajo
- * del 25% de la distancia de referencia al encuadrar la construcción.
+ * del 10% de la distancia de referencia al encuadrar la construcción.
  */
-export const NAVIGATION_MIN_RATIO = 0.25;
+export const NAVIGATION_MIN_RATIO = 0.10;
 const MAX_WHEEL_STEPS = 5;
 const WHEEL_SENSITIVITY = 0.15;
 
@@ -32,7 +32,7 @@ export function zoomAdvance(
   return { travel, nextScale };
 }
 
-/** Un arrastre de 100 px nunca baja del 25% de su recorrido inicial. */
+/** Un arrastre de 100 px nunca baja del 10% de su recorrido inicial. */
 export function panUnitsPerPixel(
   currentScale: number,
   reference: number,
