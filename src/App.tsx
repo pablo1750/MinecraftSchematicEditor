@@ -434,7 +434,9 @@ function StageHud() {
   // left up they cover the bottom of the build, which is where the ground is.
   return (
     <div className="stage-hud">
-      {cameraMode === "fly" ? (
+      {cameraMode === "look" ? (
+        <div className="hint">Girar desde la cámara · arrastrá para mirar sin mover tu posición</div>
+      ) : cameraMode === "fly" ? (
         <div className="hint">
           Click the view to look around · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move ·{" "}
           <kbd>Space</kbd>/<kbd>Shift</kbd> up and down · <kbd>R</kbd> sprint · <kbd>Esc</kbd> back to orbit
@@ -444,7 +446,7 @@ function StageHud() {
       ) : (
         <div className="hint">Right-drag to orbit · middle-drag to pan · scroll to zoom</div>
       )}
-      {toolHint && <div className="hint">{translate(toolHint)}</div>}
+      {cameraMode !== "look" && toolHint && <div className="hint">{translate(toolHint)}</div>}
 
       {keys && (
         <>
