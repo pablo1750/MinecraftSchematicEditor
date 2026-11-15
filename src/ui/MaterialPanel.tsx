@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { translate, useLocale } from "../i18n";
 import { useStore, type MaterialRow, type Region, type Tool } from "../store";
 import { cssColor } from "../core/blockLook";
 import { displayName, propertySummary, stateKey, type BlockState } from "../core/model";
@@ -35,6 +36,7 @@ type PickerTarget =
   | { kind: "fill-region" };
 
 export function MaterialPanel() {
+  const locale = useLocale();
   const build = useStore((s) => s.build);
   const revision = useStore((s) => s.revision);
   const materials = useStore((s) => s.materials);
@@ -59,14 +61,14 @@ export function MaterialPanel() {
   const rows = useMemo(() => {
     void revision;
     return materials();
-  }, [materials, revision]);
+  }, [materials, revision, locale]);
 
   const total = useMemo(() => rows.reduce((sum, row) => sum + row.count, 0), [rows]);
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return rows;
     return rows.filter(
-      (row) => row.label.toLowerCase().includes(needle) || row.state.name.includes(needle),
+      (row) => row.label.toLocaleLowerCase().includes(needle) || row.state.name.toLowerCase().includes(needle),
     );
   }, [rows, query]);
 
@@ -258,7 +260,7 @@ function ToolContext() {
     <div className="tool-context">
       <div className="tool-context-head">
         <Icon size={14} />
-        <span className="tool-context-name">{spec.label}</span>
+        <span className="tool-context-name">{translate(spec.label)}</span>
         <kbd>{spec.key}</kbd>
         <button
           className="btn tool-context-fold"
@@ -268,7 +270,7 @@ function ToolContext() {
           {anyOpen ? "Fold all" : "Open all"}
         </button>
       </div>
-      <p className="tool-context-blurb">{spec.blurb}</p>
+      <p className="tool-context-blurb">{translate(spec.blurb)}</p>
     </div>
   );
 }
