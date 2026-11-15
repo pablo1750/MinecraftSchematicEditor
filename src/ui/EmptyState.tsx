@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
+import { ServerCatalog } from "./ServerCatalog";
+import type { ConstruccionServidor, ModoGuardar } from "../server/catalog";
 import { useStore } from "../store";
 import { ACCEPTED_EXTENSIONS } from "../formats";
 import { describeAge } from "../core/session";
 import { IconOpen } from "./icons";
 import { NewBuildDialog } from "./NewBuildDialog";
 
-export function EmptyState() {
+export function EmptyState({ onServerOpen }: { onServerOpen: (entry: ConstruccionServidor, mode: ModoGuardar) => void }) {
   const status = useStore((s) => s.status);
   const error = useStore((s) => s.error);
   const packStatus = useStore((s) => s.packStatus);
@@ -23,6 +25,7 @@ export function EmptyState() {
 
   return (
     <div className="empty">
+      <ServerCatalog onOpen={onServerOpen} />
       <div className="empty-card">
         <RestoreOffer />
         <span className="eyebrow">Litematica · WorldEdit · Structure block</span>
