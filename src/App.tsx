@@ -55,7 +55,9 @@ function gridStep(
 
 export default function App() {
   const build = useStore((s) => s.build);
+  const fileName = useStore((s) => s.fileName);
   const [serverSource, setServerSource] = useState<ConstruccionServidor | null>(null);
+  const [serverLoadedFile, setServerLoadedFile] = useState<string | null>(null);
   const [serverMode, setServerMode] = useState<ModoGuardar>("nueva");
   const [dragging, setDragging] = useState(false);
   // Dropping a file replaces the build, which is the wrong answer when you
@@ -263,8 +265,8 @@ export default function App() {
       <main className="stage">
         <Viewport />
       {build && <ServerProperties
-        source={serverSource}
-        mode={serverMode}
+        source={serverLoadedFile !== null && fileName === serverLoadedFile ? serverSource : null}
+        mode={serverLoadedFile !== null && fileName === serverLoadedFile ? serverMode : "nueva"}
         onSaved={(entry) => {
           setServerSource(entry);
           setServerMode("editar");
@@ -280,6 +282,7 @@ export default function App() {
         ) : (
           <EmptyState onServerOpen={(entry, mode) => {
             setServerSource(entry);
+            setServerLoadedFile(useStore.getState().fileName);
             setServerMode(mode);
           }} />
         )}
