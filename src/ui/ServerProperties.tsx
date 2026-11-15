@@ -1,8 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useImperativeHandle, useState, type Ref } from "react";
 import { guardarConstruccion, urlImagen, type ConstruccionServidor, type ModoGuardar } from "../server/catalog";
 import { useStore } from "../store";
 
+export interface ServerPropertiesHandle {
+  save: () => void;
+}
+
 interface Props {
+  ref?: Ref<ServerPropertiesHandle>;
+  onRequireDetails: () => void;
   visible: boolean;
   onClose: () => void;
   source: ConstruccionServidor | null;
@@ -10,7 +16,7 @@ interface Props {
   onSaved: (entry: ConstruccionServidor) => void;
 }
 
-export function ServerProperties({ source, mode, onSaved, visible, onClose }: Props) {
+export function ServerProperties({ ref, onRequireDetails, source, mode, onSaved, visible, onClose }: Props) {
   const build = useStore((s) => s.build);
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -60,6 +66,7 @@ export function ServerProperties({ source, mode, onSaved, visible, onClose }: Pr
     setMessage("");
     if (!nombre.trim() || !categoria.trim()) {
       setError("Completá el nombre y la categoría.");
+      onRequireDetails();
       return;
     }
     setSaving(true);
@@ -78,6 +85,8 @@ export function ServerProperties({ source, mode, onSaved, visible, onClose }: Pr
       setSaving(false);
     }
   }
+
+  useImperativeHandle(ref, () => ({ save: () => { void save(); } }));
 
   if (!build) return null;
   return (
