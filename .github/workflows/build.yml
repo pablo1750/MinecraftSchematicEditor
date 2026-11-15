@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - desarrollo
-  workflow_dispatch:
+    paths:
+      - run_compiler.work
 
 permissions:
   contents: read
