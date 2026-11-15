@@ -41,6 +41,17 @@ export function ToolRail() {
       </button>
       <button
         className="rail-btn"
+        data-active={cameraMode === "look"}
+        onClick={() => setCameraMode("look")}
+        title={translate("Girar desde la cámara — arrastrá para mirar sin desplazarte")}
+        aria-label={translate("Girar desde la cámara")}
+        aria-pressed={cameraMode === "look"}
+      >
+        <IconOrbit size={18} />
+        <span className="rail-key">M</span>
+      </button>
+      <button
+        className="rail-btn"
         data-active={cameraMode === "fly"}
         onClick={() => setCameraMode("fly")}
         title="Walk through the build — click to look, WASD to move  (G)"
