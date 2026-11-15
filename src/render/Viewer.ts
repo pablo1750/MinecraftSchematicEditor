@@ -11,7 +11,7 @@ import type { Build } from "../core/model";
 import type { BrushShape } from "../core/brush";
 import { mirrorImages, planePosition, type MirrorConfig } from "../core/mirror";
 import { meshRegion, type MeshData } from "./mesher";
-import { orbitAroundAnchor, panUnitsPerPixel, zoomAdvance } from "./cameraNavigation";
+import { rotateCameraInPlace, panUnitsPerPixel, zoomAdvance } from "./cameraNavigation";
 import type { BakedPalette } from "./bake";
 
 // Colours here mirror the CSS tokens in styles.css.
@@ -30,7 +30,6 @@ const CHUNK = 32;
 /** Milliseconds of meshing allowed per frame, so the camera never stutters. */
 const MESH_BUDGET_MS = 10;
 
-export type CameraMode = "orbit" | "look" | "fly";
 
 /** An inclusive block range, as the overlays want it. */
 export interface Box {
@@ -234,21 +233,12 @@ export class Viewer {
    */
   private clipLift = 0;
 
-  private mode: CameraMode = "orbit";
-  /** Pointer used only for rotating the view in place (never editing). */
-  private lookPointer: { id: number; x: number; y: number } | null = null;
-  /** Desplazamiento con botón derecho, independiente de OrbitControls. */
+  /** La rotación del editor utiliza exclusivamente la posición y orientación de la cámara. */
+  private rotatePointer: { id: number; x: number; y: number } | null = null;
   private panPointer: { id: number; x: number; y: number } | null = null;
-  /** El zoom puede mover el target visual, pero no el centro del giro orbital. */
-  private orbitAnchor = new THREE.Vector3();
-  private orbitPointer: { id: number; x: number; y: number } | null = null;
-  /** Distancia inicial de encuadre y escala actual, con piso de 25%. */
+  /** Distancia de referencia del zoom/pan; ambos conservan una velocidad mínima del 10%. */
   private navigationReference = 16;
   private navigationScale = 16;
-  private keys = new Set<string>();
-  private flySpeed = 12;
-  private lastFrame = performance.now();
-  private euler = new THREE.Euler(0, 0, 0, "YXZ");
 
   /** Fired on every pointer move over the build. */
   onHover: (hit: BlockHit | null) => void = () => {};
@@ -281,23 +271,10 @@ export class Viewer {
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 4000);
     this.camera.position.set(24, 20, 34);
 
+    // Se conserva el target para el encuadre, pero OrbitControls no procesa
+    // gestos: la navegación del editor no utiliza ningún pivote al girar.
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.08;
-    this.controls.screenSpacePanning = true;
-    // Zoom hacia el cursor, no hacia un pivote fijo que termina atrapando
-    // la cámara al aproximarse al centro de una construcción grande.
-    this.controls.zoomToCursor = true;
-    // La rueda utiliza una traslación hacia el cursor, con una velocidad
-    // mínima. El dolly nativo se frena al acercarse a su pivote.
-    this.controls.enableZoom = false;
-    // Mouse orbital propio: gira alrededor del ancla estable aun después de
-    // trasladar la vista hacia un cursor alejado del centro.
-    this.controls.mouseButtons = { LEFT: undefined, MIDDLE: undefined, RIGHT: undefined };
-    // Evitar distancia ~0: el zoom exponencial pierde recorrido y puede
-    // aparentar que tanto acercar como alejar dejaron de funcionar.
-    this.controls.minDistance = 0.25;
-    this.controls.maxDistance = 2000;
+    this.controls.enabled = false;
 
     this.scene.fog = new THREE.Fog(0x0d1117, 220, 900);
     this.scene.add(
@@ -1325,16 +1302,16 @@ export class Viewer {
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    if (this.mode === "orbit" && this.orbitPointer?.id === event.pointerId) {
-      const dx = event.clientX - this.orbitPointer.x;
-      const dy = event.clientY - this.orbitPointer.y;
-      this.orbitPointer.x = event.clientX;
-      this.orbitPointer.y = event.clientY;
-      orbitAroundAnchor(this.camera, this.controls.target, this.orbitAnchor, dx, dy, rect.height);
-      this.controls.update();
+    if (this.rotatePointer?.id === event.pointerId) {
+      const dx = event.clientX - this.rotatePointer.x;
+      const dy = event.clientY - this.rotatePointer.y;
+      this.rotatePointer.x = event.clientX;
+      this.rotatePointer.y = event.clientY;
+      // El drag solo cambia el quaternion; X/Y/Z quedan exactamente iguales.
+      rotateCameraInPlace(this.camera, dx, dy);
       return;
     }
-    if (this.mode === "orbit" && this.panPointer?.id === event.pointerId) {
+    if (this.panPointer?.id === event.pointerId) {
       const dx = event.clientX - this.panPointer.x;
       const dy = event.clientY - this.panPointer.y;
       this.panPointer.x = event.clientX;
@@ -1344,29 +1321,7 @@ export class Viewer {
       const horizontal = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
       const vertical = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
       const offset = horizontal.multiplyScalar(-dx * amount).add(vertical.multiplyScalar(dy * amount));
-      this.translateView(offset, true);
-      return;
-    }
-    if (this.mode === "look" && this.lookPointer?.id === event.pointerId) {
-      const dx = event.clientX - this.lookPointer.x;
-      const dy = event.clientY - this.lookPointer.y;
-      this.lookPointer.x = event.clientX;
-      this.lookPointer.y = event.clientY;
-      // Same yaw/pitch convention as fly mode, but the camera does not move.
-      this.euler.setFromQuaternion(this.camera.quaternion, "YXZ");
-      this.euler.y -= dx * 0.0022;
-      this.euler.x -= dy * 0.0022;
-      this.euler.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this.euler.x));
-      this.camera.quaternion.setFromEuler(this.euler);
-      return;
-    }
-    if (this.mode === "look") return;
-    if (this.mode === "fly" && document.pointerLockElement === this.renderer.domElement) {
-      this.euler.setFromQuaternion(this.camera.quaternion);
-      this.euler.y -= event.movementX * 0.0022;
-      this.euler.x -= event.movementY * 0.0022;
-      this.euler.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this.euler.x));
-      this.camera.quaternion.setFromEuler(this.euler);
+      this.translateView(offset);
       return;
     }
     if (this.marqueeStart) {
@@ -1381,20 +1336,14 @@ export class Viewer {
 
   private preventCanvasMenu = (event: MouseEvent) => event.preventDefault();
 
-  /** Zoom mueve cámara+target sin desplazar el ancla orbital; pan mueve los tres. */
-  private translateView(offset: THREE.Vector3, moveOrbitAnchor = false) {
+  /** La navegación por traslación no cambia el ángulo de la cámara. */
+  private translateView(offset: THREE.Vector3) {
     this.camera.position.add(offset);
     this.controls.target.add(offset);
-    if (moveOrbitAnchor) this.orbitAnchor.add(offset);
-    this.controls.update();
   }
 
-  /**
-   * Zoom direccional continuo: no se detiene en el centro orbital ni se
-   * desacelera por debajo del 25% de la velocidad de referencia.
-   */
+  /** Zoom hacia el cursor, conservando el avance mínimo del 10%. */
   private onNavigationWheel = (event: WheelEvent) => {
-    if (this.mode !== "orbit") return;
     event.preventDefault();
     event.stopImmediatePropagation();
     const { travel, nextScale } = zoomAdvance(
@@ -1413,29 +1362,19 @@ export class Viewer {
   private painting = false;
 
   private onPointerDown = (event: PointerEvent) => {
-    if (this.mode === "orbit" && (event.button === 1 || (!this.editing && event.button === 0))) {
+    if (event.button === 1 || (!this.editing && event.button === 0)) {
       event.preventDefault();
-      this.orbitPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      this.rotatePointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
       try { this.renderer.domElement.setPointerCapture(event.pointerId); } catch { /* optional */ }
       return;
     }
-    if (this.mode === "orbit" && event.button === 2) {
+    if (event.button === 2) {
       event.preventDefault();
       this.panPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
       try { this.renderer.domElement.setPointerCapture(event.pointerId); } catch { /* optional */ }
       return;
     }
     if (event.button !== 0) return;
-    if (this.mode === "look") {
-      this.lookPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
-      try { this.renderer.domElement.setPointerCapture(event.pointerId); } catch { /* optional */ }
-      return;
-    }
-    if (this.mode === "fly") {
-      // Denied pointer lock is fine — WASD still works, only mouse-look stops.
-      Promise.resolve(this.renderer.domElement.requestPointerLock()).catch(() => {});
-      return;
-    }
     if (this.marquee) {
       this.marqueeStart = this.localPoint(event);
       this.marqueeAdditive = event.shiftKey;
@@ -1458,8 +1397,8 @@ export class Viewer {
   };
 
   private onPointerUp = (event: PointerEvent) => {
-    if (this.orbitPointer?.id === event.pointerId) {
-      this.orbitPointer = null;
+    if (this.rotatePointer?.id === event.pointerId) {
+      this.rotatePointer = null;
       if (this.renderer.domElement.hasPointerCapture(event.pointerId)) {
         this.renderer.domElement.releasePointerCapture(event.pointerId);
       }
@@ -1467,13 +1406,6 @@ export class Viewer {
     }
     if (this.panPointer?.id === event.pointerId) {
       this.panPointer = null;
-      if (this.renderer.domElement.hasPointerCapture(event.pointerId)) {
-        this.renderer.domElement.releasePointerCapture(event.pointerId);
-      }
-      return;
-    }
-    if (this.lookPointer?.id === event.pointerId) {
-      this.lookPointer = null;
       if (this.renderer.domElement.hasPointerCapture(event.pointerId)) {
         this.renderer.domElement.releasePointerCapture(event.pointerId);
       }
@@ -1489,7 +1421,7 @@ export class Viewer {
   };
 
   private onPointerLeave = () => {
-    if (this.mode === "look" || this.panPointer || this.orbitPointer) return;
+    if (this.panPointer || this.rotatePointer) return;
     // A captured marquee drag is meant to run past the edge.
     if (this.marqueeStart) return;
     if (this.painting) {
@@ -1500,13 +1432,6 @@ export class Viewer {
     this.onHover(null);
   };
 
-  private onKeyDown = (event: KeyboardEvent) => {
-    this.keys.add(event.code);
-    if (this.mode === "fly" && ["Space", "ShiftLeft"].includes(event.code)) event.preventDefault();
-  };
-  private onKeyUp = (event: KeyboardEvent) => this.keys.delete(event.code);
-  private onBlur = () => this.keys.clear();
-
   private attachInput() {
     const canvas = this.renderer.domElement;
     canvas.addEventListener("wheel", this.onNavigationWheel, { passive: false });
@@ -1515,9 +1440,6 @@ export class Viewer {
     canvas.addEventListener("pointerdown", this.onPointerDown);
     window.addEventListener("pointerup", this.onPointerUp);
     canvas.addEventListener("pointerleave", this.onPointerLeave);
-    window.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("keyup", this.onKeyUp);
-    window.addEventListener("blur", this.onBlur);
   }
 
   private detachInput() {
@@ -1528,9 +1450,6 @@ export class Viewer {
     canvas.removeEventListener("pointerdown", this.onPointerDown);
     window.removeEventListener("pointerup", this.onPointerUp);
     canvas.removeEventListener("pointerleave", this.onPointerLeave);
-    window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("keyup", this.onKeyUp);
-    window.removeEventListener("blur", this.onBlur);
   }
 
   /**
@@ -1786,9 +1705,6 @@ export class Viewer {
    */
   setEditing(editing: boolean) {
     this.editing = editing;
-    // Los gestos táctiles siguen delegados a OrbitControls. El mouse se
-    // gestiona aquí para que giro, zoom y pan usen referencias compatibles.
-    this.controls.mouseButtons = { LEFT: undefined, MIDDLE: undefined, RIGHT: undefined };
     if (!editing) {
       this.hoverBox.visible = false;
       this.showMirrorCursors(null);
@@ -1799,25 +1715,6 @@ export class Viewer {
   private editing = false;
 
   /* ---------------------------------------------------------------- camera */
-
-  setCameraMode(mode: CameraMode) {
-    if (mode === this.mode) return;
-    this.mode = mode;
-    this.lookPointer = null;
-    this.panPointer = null;
-    this.orbitPointer = null;
-    this.controls.enabled = mode === "orbit";
-    if (mode === "orbit") {
-      document.exitPointerLock?.();
-      this.controls.target.copy(
-        this.camera.position.clone().add(this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(16)),
-      );
-      this.controls.update();
-      this.orbitAnchor.copy(this.controls.target);
-    }
-    this.hoverBox.visible = false;
-    this.movePushCursor(null);
-  }
 
   /** Points the camera at the whole build from a three-quarter angle. */
   frameBuild() {
@@ -1832,38 +1729,13 @@ export class Viewer {
       center.z + distance * 0.85,
     );
     this.controls.target.copy(center);
-    this.orbitAnchor.copy(center);
     this.camera.lookAt(center);
-    this.controls.update();
     this.navigationReference = this.camera.position.distanceTo(this.controls.target);
     this.navigationScale = this.navigationReference;
-    this.flySpeed = Math.max(8, radius / 4);
-  }
-
-  private updateFly(dt: number) {
-    const forward = this.camera.getWorldDirection(new THREE.Vector3());
-    const right = new THREE.Vector3().crossVectors(forward, this.camera.up).normalize();
-    const move = new THREE.Vector3();
-    if (this.keys.has("KeyW")) move.add(forward);
-    if (this.keys.has("KeyS")) move.sub(forward);
-    if (this.keys.has("KeyD")) move.add(right);
-    if (this.keys.has("KeyA")) move.sub(right);
-    if (this.keys.has("Space")) move.y += 1;
-    if (this.keys.has("ShiftLeft") || this.keys.has("ControlLeft")) move.y -= 1;
-    if (move.lengthSq() === 0) return;
-    const speed = this.flySpeed * (this.keys.has("KeyR") ? 3 : 1);
-    this.camera.position.addScaledVector(move.normalize(), speed * dt);
   }
 
   private loop = () => {
     this.frameHandle = requestAnimationFrame(this.loop);
-    const now = performance.now();
-    // Capped so a backgrounded tab doesn't teleport the camera on return.
-    const dt = Math.min((now - this.lastFrame) / 1000, 0.1);
-    this.lastFrame = now;
-
-    if (this.mode === "fly") this.updateFly(dt);
-    else this.controls.update();
     this.updateFrameCorner();
 
     // Nothing can be meshed before the palette has been baked, and an edit that
