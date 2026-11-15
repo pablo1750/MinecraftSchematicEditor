@@ -442,9 +442,9 @@ function StageHud() {
           <kbd>Space</kbd>/<kbd>Shift</kbd> up and down · <kbd>R</kbd> sprint · <kbd>Esc</kbd> back to orbit
         </div>
       ) : tool === "move" ? (
-        <div className="hint">Drag to orbit · right-drag to pan · scroll to zoom</div>
+        <div className="hint">Drag to orbit · right-drag to pan · scroll to zoom at cursor</div>
       ) : (
-        <div className="hint">Right-drag to orbit · middle-drag to pan · scroll to zoom</div>
+        <div className="hint">Middle-drag to orbit · right-drag to pan · scroll to zoom at cursor</div>
       )}
       {cameraMode !== "look" && toolHint && <div className="hint">{translate(toolHint)}</div>}
 
