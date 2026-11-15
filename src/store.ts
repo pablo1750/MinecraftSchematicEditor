@@ -324,6 +324,7 @@ interface State {
 
 interface Actions {
   attachViewer: (viewer: Viewer | null) => void;
+  takePhoto: () => string | null;
   /** Routes a dropped file to the schematic loader or the pack loader. */
   openAny: (file: File) => Promise<void>;
   openFile: (file: File) => Promise<void>;
@@ -1558,6 +1559,7 @@ export const useStore = create<State & Actions>((set, get) => {
     undoStack: [],
     redoStack: [],
 
+    takePhoto: () => viewer?.takePhoto() ?? null,
     attachViewer: (next) => {
       viewer = next;
       if (!next) return;
