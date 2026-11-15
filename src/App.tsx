@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocale } from "./i18n";
+import { useLocale, translate } from "./i18n";
 import { useStore, type Tool } from "./store";
 import { MIRROR_AXES, mirrorActive, mirrorCopies } from "./core/mirror";
 import { Viewport } from "./ui/Viewport";
@@ -383,7 +383,7 @@ function Notice() {
   if (!notice) return null;
   return (
     <div className="notice" role="status">
-      <span>{notice}</span>
+      <span>{translate(notice)}</span>
       <button className="btn" onClick={() => useStore.getState().setNotice(null)}>Dismiss</button>
     </div>
   );
@@ -410,11 +410,11 @@ function StageHud() {
     : tool === "paint" ? "Click or drag to swap in the paint material"
     : tool === "place" ? (paint === null
       ? "Choose a paint material in the panel first — that is what gets placed"
-      : planeLock ? `Click or drag to lay blocks flat across Y ${layerLimit}`
+      : planeLock ? `${translate("Click or drag to lay blocks flat across Y")} ${layerLimit}`
       : "Click or drag on a face to add blocks against it")
     : tool === "floor" ? (paint === null
       ? "Choose a paint material in the panel first — that is what the floor is laid in"
-      : planeLock ? `Drag out a rectangle to lay a floor across Y ${layerLimit}`
+      : planeLock ? `${translate("Drag out a rectangle to lay a floor across Y")} ${layerLimit}`
       : "Press where the floor starts and drag out its far corner — it keeps the height it started at, and Y 0 over open ground")
     : tool === "push" ? "Drag the brush and every block it covers is shoved along with it · Shift keeps the shove on one axis"
     : tool === "through" ? "Drag a box over the build — every block inside it is selected, however deep or hidden · Shift adds to the selection"
@@ -444,7 +444,7 @@ function StageHud() {
       ) : (
         <div className="hint">Right-drag to orbit · middle-drag to pan · scroll to zoom</div>
       )}
-      {toolHint && <div className="hint">{toolHint}</div>}
+      {toolHint && <div className="hint">{translate(toolHint)}</div>}
 
       {keys && (
         <>
