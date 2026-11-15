@@ -11,6 +11,7 @@ import type { Build } from "../core/model";
 import type { BrushShape } from "../core/brush";
 import { mirrorImages, planePosition, type MirrorConfig } from "../core/mirror";
 import { meshRegion, type MeshData } from "./mesher";
+import { panUnitsPerPixel, zoomAdvance } from "./cameraNavigation";
 import type { BakedPalette } from "./bake";
 
 // Colours here mirror the CSS tokens in styles.css.
@@ -236,6 +237,11 @@ export class Viewer {
   private mode: CameraMode = "orbit";
   /** Pointer used only for rotating the view in place (never editing). */
   private lookPointer: { id: number; x: number; y: number } | null = null;
+  /** Desplazamiento con botón derecho, independiente de OrbitControls. */
+  private panPointer: { id: number; x: number; y: number } | null = null;
+  /** Distancia inicial de encuadre y escala actual, con piso de 25%. */
+  private navigationReference = 16;
+  private navigationScale = 16;
   private keys = new Set<string>();
   private flySpeed = 12;
   private lastFrame = performance.now();
@@ -279,6 +285,9 @@ export class Viewer {
     // Zoom hacia el cursor, no hacia un pivote fijo que termina atrapando
     // la cámara al aproximarse al centro de una construcción grande.
     this.controls.zoomToCursor = true;
+    // La rueda utiliza una traslación hacia el cursor, con una velocidad
+    // mínima. El dolly nativo se frena al acercarse a su pivote.
+    this.controls.enableZoom = false;
     // Evitar distancia ~0: el zoom exponencial pierde recorrido y puede
     // aparentar que tanto acercar como alejar dejaron de funcionar.
     this.controls.minDistance = 0.25;
@@ -1310,6 +1319,19 @@ export class Viewer {
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    if (this.mode === "orbit" && this.panPointer?.id === event.pointerId) {
+      const dx = event.clientX - this.panPointer.x;
+      const dy = event.clientY - this.panPointer.y;
+      this.panPointer.x = event.clientX;
+      this.panPointer.y = event.clientY;
+      const amount = panUnitsPerPixel(this.navigationScale, this.navigationReference,
+        this.camera.fov, rect.height);
+      const horizontal = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+      const vertical = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
+      const offset = horizontal.multiplyScalar(-dx * amount).add(vertical.multiplyScalar(dy * amount));
+      this.translateView(offset);
+      return;
+    }
     if (this.mode === "look" && this.lookPointer?.id === event.pointerId) {
       const dx = event.clientX - this.lookPointer.x;
       const dy = event.clientY - this.lookPointer.y;
@@ -1342,9 +1364,45 @@ export class Viewer {
     if (this.painting && hit) this.onPick(hit, event);
   };
 
+  private preventCanvasMenu = (event: MouseEvent) => event.preventDefault();
+
+  /** Traslada cámara y pivote juntos, sin cambiar el ángulo orbital. */
+  private translateView(offset: THREE.Vector3) {
+    this.camera.position.add(offset);
+    this.controls.target.add(offset);
+    this.controls.update();
+  }
+
+  /**
+   * Zoom direccional continuo: no se detiene en el centro orbital ni se
+   * desacelera por debajo del 25% de la velocidad de referencia.
+   */
+  private onNavigationWheel = (event: WheelEvent) => {
+    if (this.mode !== "orbit") return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const { travel, nextScale } = zoomAdvance(
+      this.navigationScale, this.navigationReference, event.deltaY, event.deltaMode);
+    if (travel === 0) return;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    const direction = new THREE.Vector3(x, y, 0.5)
+      .unproject(this.camera).sub(this.camera.position).normalize();
+    this.translateView(direction.multiplyScalar(travel));
+    this.navigationScale = nextScale;
+  };
+
   private painting = false;
 
   private onPointerDown = (event: PointerEvent) => {
+    if (this.mode === "orbit" && event.button === 2) {
+      event.preventDefault();
+      this.panPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      try { this.renderer.domElement.setPointerCapture(event.pointerId); } catch { /* optional */ }
+      return;
+    }
     if (event.button !== 0) return;
     if (this.mode === "look") {
       this.lookPointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
@@ -1378,6 +1436,13 @@ export class Viewer {
   };
 
   private onPointerUp = (event: PointerEvent) => {
+    if (this.panPointer?.id === event.pointerId) {
+      this.panPointer = null;
+      if (this.renderer.domElement.hasPointerCapture(event.pointerId)) {
+        this.renderer.domElement.releasePointerCapture(event.pointerId);
+      }
+      return;
+    }
     if (this.lookPointer?.id === event.pointerId) {
       this.lookPointer = null;
       if (this.renderer.domElement.hasPointerCapture(event.pointerId)) {
@@ -1395,7 +1460,7 @@ export class Viewer {
   };
 
   private onPointerLeave = () => {
-    if (this.mode === "look") return;
+    if (this.mode === "look" || this.panPointer) return;
     // A captured marquee drag is meant to run past the edge.
     if (this.marqueeStart) return;
     if (this.painting) {
@@ -1415,6 +1480,8 @@ export class Viewer {
 
   private attachInput() {
     const canvas = this.renderer.domElement;
+    canvas.addEventListener("wheel", this.onNavigationWheel, { passive: false });
+    canvas.addEventListener("contextmenu", this.preventCanvasMenu);
     canvas.addEventListener("pointermove", this.onPointerMove);
     canvas.addEventListener("pointerdown", this.onPointerDown);
     window.addEventListener("pointerup", this.onPointerUp);
@@ -1426,6 +1493,8 @@ export class Viewer {
 
   private detachInput() {
     const canvas = this.renderer.domElement;
+    canvas.removeEventListener("wheel", this.onNavigationWheel);
+    canvas.removeEventListener("contextmenu", this.preventCanvasMenu);
     canvas.removeEventListener("pointermove", this.onPointerMove);
     canvas.removeEventListener("pointerdown", this.onPointerDown);
     window.removeEventListener("pointerup", this.onPointerUp);
@@ -1689,8 +1758,8 @@ export class Viewer {
   setEditing(editing: boolean) {
     this.editing = editing;
     this.controls.mouseButtons = editing
-      ? { LEFT: undefined, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN }
-      : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+      ? { LEFT: undefined, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: undefined }
+      : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: undefined };
     if (!editing) {
       this.hoverBox.visible = false;
       this.showMirrorCursors(null);
@@ -1706,6 +1775,7 @@ export class Viewer {
     if (mode === this.mode) return;
     this.mode = mode;
     this.lookPointer = null;
+    this.panPointer = null;
     this.controls.enabled = mode === "orbit";
     if (mode === "orbit") {
       document.exitPointerLock?.();
@@ -1733,6 +1803,8 @@ export class Viewer {
     this.controls.target.copy(center);
     this.camera.lookAt(center);
     this.controls.update();
+    this.navigationReference = this.camera.position.distanceTo(this.controls.target);
+    this.navigationScale = this.navigationReference;
     this.flySpeed = Math.max(8, radius / 4);
   }
 
