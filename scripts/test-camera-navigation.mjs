@@ -8,6 +8,12 @@ assert.match(viewer, /this\.translateView\(direction\.multiplyScalar\(travel\)\)
 assert.match(viewer, /this\.translateView\(offset\)/);
 assert.match(viewer, /this\.panPointer\?\.id === event\.pointerId/);
 assert.match(viewer, /this\.rotatePointer\?\.id === event\.pointerId/);
+assert.match(viewer, /if \(event\.button === 2\) \{[\s\S]*?this\.rotatePointer =/);
+assert.match(viewer, /if \(event\.button === 1 \|\| \(!this\.editing && event\.button === 0\)\) \{[\s\S]*?this\.panPointer =/);
+const app = readFileSync("src/App.tsx", "utf8");
+assert.match(app, /Clic izquierdo para desplazar · clic derecho para girar/);
+assert.match(app, /Clic izquierdo para editar · botón central para desplazar/);
+
 assert.match(viewer, /rotateCameraInPlace\(this\.camera, dx, dy\)/);
 assert.doesNotMatch(viewer, /orbitAroundAnchor|this\.orbitAnchor/);
 
