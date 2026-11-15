@@ -22,10 +22,11 @@ export function localizationPlugin() {
       if (!file.endsWith(".tsx") || !file.startsWith(sourceRoot + path.sep)) return null;
       if (file.includes(path.sep + "i18n" + path.sep)) return null;
       const dictionary = JSON.parse(readFileSync(dictionaryPath, "utf8"));
+      const translatable = new Set([...Object.keys(dictionary), ...Object.values(dictionary)]);
       let replacements = 0;
 
       let code = source.replace(supportedAttributes, (original, name, value) => {
-        if (!Object.hasOwn(dictionary, value)) return original;
+        if (!translatable.has(value)) return original;
         replacements++;
         return name + "={__tr(" + JSON.stringify(value) + ")}";
       });
@@ -33,7 +34,7 @@ export function localizationPlugin() {
       // Se procesa por texto completo entre tags: cualquier sección con JSX
       // dinámico se deja tal cual para no intervenir en lógica condicional.
       code = code.replace(jsxText, (original, value) => {
-        if (!Object.hasOwn(dictionary, value.trim().replace(/\s+/g, " "))) return original;
+        if (!translatable.has(value.trim().replace(/\s+/g, " "))) return original;
         replacements++;
         return ">{__trText(" + JSON.stringify(value) + ")}<";
       });
