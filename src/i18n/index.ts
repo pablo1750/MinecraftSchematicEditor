@@ -42,7 +42,7 @@ export function translateText(value: string): string {
   const prefix = /^\s*/.exec(value)?.[0] ?? "";
   const suffix = /\s*$/.exec(value)?.[0] ?? "";
   const middle = value.slice(prefix.length, value.length - suffix.length);
-  return prefix + (current === "es-AR" ? translate(middle.replace(/\\s+/g, " ")) : middle) + suffix;
+  return prefix + (current === "es-AR" ? translate(middle.replace(/\s+/g, " ")) : middle) + suffix;
 }
 
 /** Dejar el identificador en inglés es imprescindible para los archivos Minecraft. */
