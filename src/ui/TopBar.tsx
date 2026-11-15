@@ -14,7 +14,7 @@ const SAVE_FORMATS: { id: SaveFormat; label: string }[] = [
   { id: "nbt", label: "Structure" },
 ];
 
-export function TopBar() {
+export function TopBar({ propertiesVisible, onToggleProperties }: { propertiesVisible: boolean; onToggleProperties: () => void }) {
   const build = useStore((s) => s.build);
   const fileName = useStore((s) => s.fileName);
   const undoStack = useStore((s) => s.undoStack);
@@ -92,6 +92,13 @@ export function TopBar() {
 
       <span className="topbar-spacer" />
 
+      {build && (
+        <button className="btn btn-outline" type="button" onClick={onToggleProperties}
+          aria-pressed={propertiesVisible} aria-controls="server-properties-panel"
+          title={propertiesVisible ? "Ocultar propiedades" : "Mostrar propiedades"}>
+          Propiedades
+        </button>
+      )}
       <TexturePack />
       <ModPacks />
 
