@@ -61,7 +61,19 @@ export async function descargarConstruccion(construccion: ConstruccionServidor):
   await assertResponse(response);
   const ext = construccion.editor_schem || construccion.original_schem ? "schem"
     : construccion.original_litematic ? "litematic" : "schematic";
-  return new File([await response.blob()], construccion.id + "." + ext, { type: "application/octet-stream" });
+  const blob = await response.blob();
+  const prefix = new Uint8Array(await blob.slice(0, 64).arrayBuffer());
+  const isGzip = prefix.length > 1 && prefix[0] === 0x1f && prefix[1] === 0x8b;
+  const isRawNbt = prefix[0] === 0x0a;
+  const isZlib = prefix.length > 1 && (prefix[0] & 0x0f) === 0x08 &&
+    (((prefix[0] << 8) | prefix[1]) % 31 === 0);
+  if (!isGzip && !isRawNbt && !isZlib) {
+    const isMarkup = new TextDecoder().decode(prefix).trimStart().startsWith("<");
+    throw new Error(isMarkup
+      ? "El servidor devolvió HTML en lugar del archivo NBT. Revisá el endpoint de descarga en PHP."
+      : "La descarga no contiene un NBT válido. Revisá el archivo original del catálogo.");
+  }
+  return new File([blob], construccion.id + "." + ext, { type: "application/octet-stream" });
 }
 
 export type ModoGuardar = "editar" | "version" | "nueva";
