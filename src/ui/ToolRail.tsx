@@ -48,7 +48,7 @@ export function ToolRail() {
         aria-pressed={cameraMode === "look"}
       >
         <IconOrbit size={18} />
-        <span className="rail-key">M</span>
+        <span className="rail-key">◎</span>
       </button>
       <button
         className="rail-btn"
