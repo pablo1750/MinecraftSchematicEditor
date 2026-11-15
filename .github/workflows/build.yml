@@ -74,6 +74,7 @@ jobs:
       - name: Configurar SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EDITOR_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.EDITOR_SSH_KNOWN_HOSTS }}
           DEPLOY_HOST: ${{ vars.EDITOR_SSH_HOST }}
           DEPLOY_USER: ${{ vars.EDITOR_SSH_USER }}
           DEPLOY_PORT: ${{ vars.EDITOR_SSH_PORT }}
@@ -81,6 +82,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
           [[ "$DEPLOY_HOST" =~ ^[a-zA-Z0-9.-]+$ ]]
           [[ "$DEPLOY_USER" =~ ^[a-zA-Z0-9_-]+$ ]]
           [[ "$DEPLOY_PORT" =~ ^[0-9]{1,5}$ ]]
@@ -90,7 +92,7 @@ jobs:
           chmod 700 "$HOME/.ssh"
           printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
-          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" > "$HOME/.ssh/known_hosts"
+          printf '%s\\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
           echo "DEPLOY_TARGET=$DEPLOY_USER@$DEPLOY_HOST" >> "$GITHUB_ENV"
           echo "DEPLOY_PORT=$DEPLOY_PORT" >> "$GITHUB_ENV"
