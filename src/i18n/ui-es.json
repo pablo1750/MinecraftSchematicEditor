@@ -391,5 +391,10 @@
   "starts over": "reinicia",
   "copies the selection ·": "copia la selección ·",
   "erases it ·": "la elimina ·",
-  "clears it": "la desmarca"
+  "clears it": "la desmarca",
+  "Rotate at camera position — drag to look around without moving": "Girar desde la cámara — arrastrá para mirar sin desplazarte",
+  "Rotate at camera position": "Girar desde la cámara",
+  "Girar desde la cámara — arrastrá para mirar sin desplazarte": "Girar desde la cámara — arrastrá para mirar sin desplazarte",
+  "Girar desde la cámara": "Girar desde la cámara",
+  "Girar desde la cámara · arrastrá para mirar sin mover tu posición": "Girar desde la cámara · arrastrá para mirar sin mover tu posición"
 }
