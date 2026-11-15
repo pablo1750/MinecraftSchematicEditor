@@ -56,7 +56,7 @@ jobs:
           name: schematic-editor-dist
           path: dist/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 2
 
   deploy:
     name: Deploy /editor/
