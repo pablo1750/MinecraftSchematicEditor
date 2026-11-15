@@ -1,0 +1,58 @@
+name: Build Schematic Editor
+
+on:
+  push:
+    branches:
+      - desarrollo
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/desarrollo'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout desarrollo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate TypeScript
+        run: npm run typecheck
+
+      - name: Build production
+        run: npm run build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+
+      - name: Publish build summary
+        if: always()
+        run: |
+          echo "## Schematic Editor — compilación" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Rama: \`${{ github.ref_name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Node.js: 22" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Verificaciones: npm ci, typecheck, build" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Resultado: \`${{ job.status }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload compiled site
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: schematic-editor-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
