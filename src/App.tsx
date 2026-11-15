@@ -428,9 +428,9 @@ function StageHud() {
   return (
     <div className="stage-hud">
       {tool === "move" ? (
-        <div className="hint">Arrastrá para girar desde la cámara · clic derecho para desplazar · rueda para zoom</div>
+        <div className="hint">Clic izquierdo para desplazar · clic derecho para girar desde la cámara · rueda para zoom</div>
       ) : (
-        <div className="hint">Botón central para girar desde la cámara · clic derecho para desplazar · rueda para zoom</div>
+        <div className="hint">Clic izquierdo para editar · botón central para desplazar · clic derecho para girar · rueda para zoom</div>
       )}
       {toolHint && <div className="hint">{translate(toolHint)}</div>}
 
