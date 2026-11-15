@@ -396,5 +396,7 @@
   "Rotate at camera position": "Girar desde la cámara",
   "Girar desde la cámara — arrastrá para mirar sin desplazarte": "Girar desde la cámara — arrastrá para mirar sin desplazarte",
   "Girar desde la cámara": "Girar desde la cámara",
-  "Girar desde la cámara · arrastrá para mirar sin mover tu posición": "Girar desde la cámara · arrastrá para mirar sin mover tu posición"
+  "Girar desde la cámara · arrastrá para mirar sin mover tu posición": "Girar desde la cámara · arrastrá para mirar sin mover tu posición",
+  "Middle-drag to orbit · right-drag to pan · scroll to zoom at cursor": "Arrastrá con el botón central para girar · derecho para desplazar · rueda para acercar al cursor",
+  "Drag to orbit · right-drag to pan · scroll to zoom at cursor": "Arrastrá para girar · botón derecho para desplazar · rueda para acercar al cursor"
 }
