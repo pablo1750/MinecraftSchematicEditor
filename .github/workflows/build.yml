@@ -37,6 +37,9 @@ jobs:
       - name: Test layer visibility regression
         run: node scripts/test-layer-visibility.mjs
 
+      - name: Test camera rotation in place
+        run: node scripts/test-camera-look.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
