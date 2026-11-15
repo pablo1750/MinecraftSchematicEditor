@@ -532,14 +532,24 @@ export class Viewer {
     if (!this.build) return;
     const next = Math.max(0, Math.min(this.build.height - 1, y));
     if (next === this.yLimit) return;
-    const low = Math.min(next, this.yLimit);
-    const high = Math.max(next, this.yLimit);
+    const previous = this.yLimit;
+    const low = Math.min(next, previous);
+    const high = Math.max(next, previous);
     this.yLimit = next;
-    // Only chunks in the band between the old and new limit change.
-    for (const chunk of this.chunks) {
-      const top = chunk.cy * CHUNK + CHUNK - 1;
-      const bottom = chunk.cy * CHUNK;
-      if (top >= low && bottom <= high + 1) this.markChunkDirty(chunk);
+
+    if (next > previous) {
+      // Showing hidden floors must reconstruct the scene from the full Build.
+      // The geometry cache is disposable: an edit or an async palette rebake
+      // while clipped may have invalidated chunks outside the changed band.
+      // Never depend on a stale clipped mesh when restoring a structure.
+      this.invalidateAll();
+    } else {
+      // Hiding floors can keep the fast path: rebuild the cut and its seam.
+      for (const chunk of this.chunks) {
+        const top = chunk.cy * CHUNK + CHUNK - 1;
+        const bottom = chunk.cy * CHUNK;
+        if (top >= low && bottom <= high + 1) this.markChunkDirty(chunk);
+      }
     }
     this.buildFrame();
     this.updatePlane();
