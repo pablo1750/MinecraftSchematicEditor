@@ -3,12 +3,14 @@ import { guardarConstruccion, urlImagen, type ConstruccionServidor, type ModoGua
 import { useStore } from "../store";
 
 interface Props {
+  visible: boolean;
+  onClose: () => void;
   source: ConstruccionServidor | null;
   mode: ModoGuardar;
   onSaved: (entry: ConstruccionServidor) => void;
 }
 
-export function ServerProperties({ source, mode, onSaved }: Props) {
+export function ServerProperties({ source, mode, onSaved, visible, onClose }: Props) {
   const build = useStore((s) => s.build);
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -79,9 +81,10 @@ export function ServerProperties({ source, mode, onSaved }: Props) {
 
   if (!build) return null;
   return (
-    <aside className="server-properties">
+    <aside id="server-properties-panel" className={"server-properties" + (visible ? "" : " server-properties--hidden")} aria-hidden={!visible} inert={!visible}>
       <div className="server-properties-title">
         <h2>Propiedades</h2>
+        <button className="server-properties-close" type="button" onClick={onClose} aria-label="Ocultar propiedades" title="Ocultar propiedades">×</button>
         <span className="eyebrow">{mode === "editar" ? "Editar construcción" : mode === "version" ? "Nueva versión" : "Nueva construcción"}</span>
       </div>
       <label>Nombre
