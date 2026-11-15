@@ -46,6 +46,9 @@ jobs:
       - name: Test in-place camera rotation after off-center zoom
         run: node scripts/test-camera-orbit-after-zoom.mjs
 
+      - name: Test quick save from toolbar
+        run: node scripts/test-quick-save.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
