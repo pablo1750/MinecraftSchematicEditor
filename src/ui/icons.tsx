@@ -148,6 +148,15 @@ export const IconRedo = ({ size = 16 }: Props) => (
   </svg>
 );
 
+/** Guardar la construcción en el catálogo del servidor. */
+export const IconSave = ({ size = 16 }: Props) => (
+  <svg {...base(size)}>
+    <path d="M2.5 2.5h9l2 2v9h-11z" />
+    <path d="M5 2.5v4.2h5.6V2.5M4.7 13.5V9.4h6.6v4.1" />
+    <path d="M9.1 3.6v2.2" />
+  </svg>
+);
+
 export const IconDownload = ({ size = 16 }: Props) => (
   <svg {...base(size)}>
     <path d="M8 2.6v7.2" />
