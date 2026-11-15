@@ -1,4 +1,5 @@
 import { useStore } from "../store";
+import { translate } from "../i18n";
 import { IconFly, IconFrame, IconOrbit } from "./icons";
 import { TOOLS } from "./tools";
 
@@ -18,7 +19,7 @@ export function ToolRail() {
           data-active={tool === id}
           data-empty={id === "clone" && !clip}
           onClick={() => setTool(id)}
-          title={`${label} — ${blurb}  (${key})`}
+          title={`${translate(label)} — ${translate(blurb)}  (${key})`}
           aria-pressed={tool === id}
         >
           <Icon size={18} />
