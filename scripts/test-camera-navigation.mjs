@@ -5,7 +5,7 @@ import { createServer } from "vite";
 const viewer = readFileSync("src/render/Viewer.ts", "utf8");
 assert.match(viewer, /this\.controls\.enableZoom\s*=\s*false;/);
 assert.match(viewer, /this\.onNavigationWheel/);
-assert.match(viewer, /this\.translateView\(offset\)/);
+assert.match(viewer, /this\.translateView\(direction\.multiplyScalar\(travel\)\)/);
 assert.match(viewer, /this\.orbitPointer\?\.id === event\.pointerId/);
 assert.match(viewer, /orbitAroundAnchor\(this\.camera, this\.controls\.target, this\.orbitAnchor/);
 assert.match(viewer, /this\.translateView\(offset, true\)/);
