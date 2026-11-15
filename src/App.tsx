@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocale } from "./i18n";
 import { useStore, type Tool } from "./store";
 import { MIRROR_AXES, mirrorActive, mirrorCopies } from "./core/mirror";
 import { Viewport } from "./ui/Viewport";
@@ -54,6 +55,7 @@ function gridStep(
 }
 
 export default function App() {
+  useLocale(); // Rerenderizar paneles y textos al cambiar de idioma.
   const build = useStore((s) => s.build);
   const fileName = useStore((s) => s.fileName);
   const [serverSource, setServerSource] = useState<ConstruccionServidor | null>(null);
