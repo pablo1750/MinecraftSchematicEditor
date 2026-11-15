@@ -60,7 +60,7 @@ export function readSponge(root: NbtCompound): Build {
   });
 }
 
-/** Writes version 2, which every current WorldEdit build reads. */
+/** Sponge Schematic v3, compatible con el parser y motor Bedrock PHP. */
 export function writeSponge(build: Build): Tagged {
   const palette: Record<string, Tagged> = {};
   build.palette.forEach((state, index) => {
@@ -68,22 +68,20 @@ export function writeSponge(build: Build): Tagged {
   });
 
   return nbt.compound({
-    Version: nbt.int(2),
+    Version: nbt.int(3),
     DataVersion: nbt.int(build.meta.dataVersion),
     Width: nbt.short(build.width),
     Height: nbt.short(build.height),
     Length: nbt.short(build.length),
     Offset: nbt.intArray([0, 0, 0]),
-    PaletteMax: nbt.int(build.palette.length),
-    Palette: nbt.compound(palette),
-    BlockData: nbt.byteArray(writeVarints(build.data)),
-    BlockEntities: nbt.list(TAG.Compound, []),
+    Blocks: nbt.compound({
+      Palette: nbt.compound(palette),
+      Data: nbt.byteArray(writeVarints(build.data)),
+      BlockEntities: nbt.list(TAG.Compound, []),
+    }),
     Metadata: nbt.compound({
       Name: nbt.string(build.meta.name),
       Author: nbt.string(build.meta.author),
-      WEOffsetX: nbt.int(0),
-      WEOffsetY: nbt.int(0),
-      WEOffsetZ: nbt.int(0),
     }),
   });
 }
