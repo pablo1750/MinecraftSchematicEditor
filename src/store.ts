@@ -150,7 +150,6 @@ interface State {
   notice: string | null;
 
   tool: Tool;
-  cameraMode: "orbit" | "look" | "fly";
   layerLimit: number;
   /** Highlighted in the viewport and targeted by the material actions. */
   selectedMaterial: number | null;
@@ -382,7 +381,6 @@ interface Actions {
   flushAutosave: () => void;
 
   setTool: (tool: Tool) => void;
-  setCameraMode: (mode: "orbit" | "look" | "fly") => void;
   frameBuild: () => void;
   setLayerLimit: (y: number) => void;
   selectMaterial: (paletteIndex: number | null) => void;
@@ -1397,7 +1395,6 @@ export const useStore = create<State & Actions>((set, get) => {
   function adoptBuild(build: Build, fileName: string | null, inNewTab = false) {
     if (inNewTab) stashActive();
     installBuild(build);
-    viewer?.setCameraMode("orbit");
     viewer?.setEditing(false);
     const hotbar = seedHotbar(build);
     set({
@@ -1406,7 +1403,6 @@ export const useStore = create<State & Actions>((set, get) => {
       status: "ready",
       error: null,
       notice: null,
-      cameraMode: "orbit",
       revision: get().revision + 1,
       layerLimit: build.height - 1,
       selectedMaterial: null,
@@ -1491,7 +1487,6 @@ export const useStore = create<State & Actions>((set, get) => {
     notice: null,
 
     tool: "move",
-    cameraMode: "orbit",
     layerLimit: 0,
     selectedMaterial: null,
     paintMaterial: null,
@@ -2024,11 +2019,6 @@ export const useStore = create<State & Actions>((set, get) => {
       syncClip();
       syncTool();
       drawPin();
-    },
-
-    setCameraMode: (mode) => {
-      viewer?.setCameraMode(mode);
-      set({ cameraMode: mode });
     },
 
     frameBuild: () => viewer?.frameBuild(),
