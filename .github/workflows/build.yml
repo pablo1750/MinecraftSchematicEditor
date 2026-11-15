@@ -34,6 +34,9 @@ jobs:
       - name: Validate translations
         run: node scripts/test-i18n.mjs
 
+      - name: Test layer visibility regression
+        run: node scripts/test-layer-visibility.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
