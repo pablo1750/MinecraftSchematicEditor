@@ -5,6 +5,10 @@ import ui from "./ui-es.json";
 export type Locale = "es-AR" | "en-US";
 const BLOCKS = names as Record<string, string>;
 const UI = ui as Record<string, string>;
+const REVERSE_UI: Record<string, string> = {};
+for (const [english, spanish] of Object.entries(UI)) {
+  if (!Object.hasOwn(REVERSE_UI, spanish)) REVERSE_UI[spanish] = english;
+}
 
 let current: Locale = (() => {
   try {
@@ -33,7 +37,7 @@ export function setLocale(locale: Locale): void {
 
 /** Textos visibles: las cadenas técnicas, rutas y los identificadores no se traducen. */
 export function translate(value: string): string {
-  if (current === "en-US") return value;
+  if (current === "en-US") return REVERSE_UI[value] ?? value;
   return UI[value] ?? value;
 }
 
@@ -42,7 +46,7 @@ export function translateText(value: string): string {
   const prefix = /^\s*/.exec(value)?.[0] ?? "";
   const suffix = /\s*$/.exec(value)?.[0] ?? "";
   const middle = value.slice(prefix.length, value.length - suffix.length);
-  return prefix + (current === "es-AR" ? translate(middle.replace(/\s+/g, " ")) : middle) + suffix;
+  return prefix + translate(middle.replace(/\s+/g, " ")) + suffix;
 }
 
 /** Dejar el identificador en inglés es imprescindible para los archivos Minecraft. */
