@@ -6,8 +6,10 @@ const viewer = readFileSync("src/render/Viewer.ts", "utf8");
 assert.match(viewer, /this\.controls\.enableZoom\s*=\s*false;/);
 assert.match(viewer, /this\.onNavigationWheel/);
 assert.match(viewer, /this\.translateView\(offset\)/);
-assert.match(viewer, /MIDDLE: THREE\.MOUSE\.ROTATE, RIGHT: undefined/);
-assert.match(viewer, /LEFT: THREE\.MOUSE\.ROTATE, MIDDLE: THREE\.MOUSE\.DOLLY, RIGHT: undefined/);
+assert.match(viewer, /this\.orbitPointer\?\.id === event\.pointerId/);
+assert.match(viewer, /orbitAroundAnchor\(this\.camera, this\.controls\.target, this\.orbitAnchor/);
+assert.match(viewer, /this\.translateView\(offset, true\)/);
+assert.match(viewer, /this\.orbi[t]Anchor\.copy\(center\)/);
 assert.match(viewer, /this\.panPointer\?\.id === event\.pointerId/);
 
 const server = await createServer({ configFile: false, server: { middlewareMode: true }, appType: "custom" });
