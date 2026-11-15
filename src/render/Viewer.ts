@@ -148,7 +148,7 @@ export class Viewer {
    */
   takePhoto(): string {
     this.renderer.render(this.scene, this.camera);
-    return this.renderer.domElement.toDataURL("image/png");
+    return this.renderer.domElement.toDataURL("image/webp", 0.88);
   }
 
   private renderer: THREE.WebGLRenderer;
