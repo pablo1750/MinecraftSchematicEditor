@@ -37,13 +37,13 @@ jobs:
       - name: Test layer visibility regression
         run: node scripts/test-layer-visibility.mjs
 
-      - name: Test camera rotation in place
+      - name: Test unique editor camera rotation in place
         run: node scripts/test-camera-look.mjs
 
       - name: Test camera zoom and pan navigation
         run: node scripts/test-camera-navigation.mjs
 
-      - name: Test orbital rotation after off-center zoom
+      - name: Test in-place camera rotation after off-center zoom
         run: node scripts/test-camera-orbit-after-zoom.mjs
 
       - name: Validate TypeScript
