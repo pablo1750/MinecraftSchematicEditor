@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocale, translate } from "./i18n";
 import { useStore, type Tool } from "./store";
 import { MIRROR_AXES, mirrorActive, mirrorCopies } from "./core/mirror";
@@ -10,7 +10,7 @@ import { MaterialPanel } from "./ui/MaterialPanel";
 import { StatusBar } from "./ui/StatusBar";
 import { LayerSlider } from "./ui/LayerSlider";
 import { EmptyState } from "./ui/EmptyState";
-import { ServerProperties } from "./ui/ServerProperties";
+import { ServerProperties, type ServerPropertiesHandle } from "./ui/ServerProperties";
 import type { ConstruccionServidor, ModoGuardar } from "./server/catalog";
 import { Hotbar } from "./ui/Hotbar";
 import { toggleSection, useSectionOpen } from "./ui/Section";
@@ -61,7 +61,13 @@ export default function App() {
   const [serverSource, setServerSource] = useState<ConstruccionServidor | null>(null);
   const [serverLoadedFile, setServerLoadedFile] = useState<string | null>(null);
   const [serverMode, setServerMode] = useState<ModoGuardar>("nueva");
+  const serverPropertiesRef = useRef<ServerPropertiesHandle>(null);
+  // La construcción recién creada no tiene fileName; recordar su instancia
+  // evita que un segundo Guardar genere una duplicación en el catálogo.
+  const savedBuildRef = useRef<typeof build>(null);
   const [propertiesVisible, setPropertiesVisible] = useState(true);
+  const sourceIsCurrent = serverSource !== null && build !== null &&
+    ((serverLoadedFile !== null && fileName === serverLoadedFile) || savedBuildRef.current === build);
   const [dragging, setDragging] = useState(false);
   // Dropping a file replaces the build, which is the wrong answer when you
   // meant to bring a design *into* it, or to work on it beside this one. Shift
@@ -255,20 +261,26 @@ export default function App() {
         else store.openAny(file);
       }}
     >
-      <TopBar propertiesVisible={propertiesVisible} onToggleProperties={() => setPropertiesVisible((visible) => !visible)} />
+      <TopBar propertiesVisible={propertiesVisible}
+        onToggleProperties={() => setPropertiesVisible((visible) => !visible)}
+        onSave={() => serverPropertiesRef.current?.save()} />
       <DocTabs />
       {build && <ToolRail />}
 
       <main className="stage">
         <Viewport />
       {build && <ServerProperties
+        ref={serverPropertiesRef}
         visible={propertiesVisible}
         onClose={() => setPropertiesVisible(false)}
-        source={serverLoadedFile !== null && fileName === serverLoadedFile ? serverSource : null}
-        mode={serverLoadedFile !== null && fileName === serverLoadedFile ? serverMode : "nueva"}
+        onRequireDetails={() => setPropertiesVisible(true)}
+        source={sourceIsCurrent ? serverSource : null}
+        mode={sourceIsCurrent ? serverMode : "nueva"}
         onSaved={(entry) => {
+          savedBuildRef.current = build;
           setServerSource(entry);
           setServerMode("editar");
+          useStore.getState().setNotice("Construcción guardada en el servidor.");
         }}
       />}
         {build ? (
