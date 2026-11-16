@@ -407,6 +407,27 @@ const PANE_BOXES: readonly Box[] = [
  * Java), but create the geometry for five independent connected pieces.
  * No new textures are required, and the existing shader can render them.
  */
+/**
+ * Bedrock's blocks.json uses east/west for the opaque narrow pane edge and
+ * north/south for the transparent glass face. Those directions describe the
+ * texture roles, not a fixed world orientation: connected arms turn freely.
+ * Keep the edge texture on horizontal caps and the glass texture on every
+ * vertical side, regardless of which side the camera sees.
+ */
+export function paneTextureFace(
+  reference: ElementDef["faces"],
+  face: FaceName,
+): ElementDef["faces"][FaceName] {
+  const isBedrock = reference.north?.texture.startsWith("minecraft:block/bedrock/") ?? false;
+  if (isBedrock) {
+    if (face === "up" || face === "down") {
+      return reference.east ?? reference.west ?? reference.up ?? reference.down;
+    }
+    return reference.north ?? reference.south ?? reference[face];
+  }
+  return reference[face] ?? reference.north ?? reference.south;
+}
+
 function bakePaneParts(
   state: BlockState,
   resolved: ReturnType<typeof resolveState>,
@@ -422,7 +443,7 @@ function bakePaneParts(
   return PANE_BOXES.map((box) => {
     const faces: ElementDef["faces"] = {};
     for (const face of Object.keys(FACE_NAMES) as FaceName[]) {
-      const source = reference[face] ?? reference.north ?? reference.south;
+      const source = paneTextureFace(reference, face);
       if (!source) continue;
       // UVs derive from the new piece's dimensions; full-block UVs must not
       // be inherited from the old crossed-pane geometry.
