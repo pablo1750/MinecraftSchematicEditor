@@ -49,6 +49,9 @@ jobs:
       - name: Test quick save from toolbar
         run: node scripts/test-quick-save.mjs
 
+      - name: Test connected glass panes
+        run: node scripts/test-glass-pane-connections.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
