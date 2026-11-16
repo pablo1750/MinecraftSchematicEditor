@@ -64,6 +64,9 @@ jobs:
       - name: Test Bedrock fence gates
         run: node scripts/test-bedrock-fence-gates.mjs
 
+      - name: Test physical style edits and air overrides
+        run: node scripts/test-style-layers.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
