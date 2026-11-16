@@ -3,7 +3,8 @@ import { translate, useLocale } from "../i18n";
 import { ALL_COMMON_BLOCKS, BLOCK_GROUPS } from "../core/commonBlocks";
 import { groupBlocks } from "../core/blockCatalog";
 import { cssColor } from "../core/blockLook";
-import { displayName, normalizeName, parseStateKey, type BlockState } from "../core/model";
+import { displayName, type BlockState } from "../core/model";
+import { matchingBlockIds, typedBlock } from "./blockPickerSearch";
 import { useStore } from "../store";
 import { IconClose } from "./icons";
 
@@ -78,28 +79,34 @@ export function BlockPicker({ title, onPick, onClose }: Props) {
     [modBlocks],
   );
 
+  const knownIds = useMemo(() => new Set([
+    ...inBuild,
+    ...catalogue.flatMap(group => group.blocks),
+    ...modCatalogue.flatMap(group => group.blocks),
+  ]), [inBuild, catalogue, modCatalogue]);
+
   const groups = useMemo(() => {
     const all = [
       { name: "Already in this build", blocks: inBuild },
       ...catalogue,
       ...modCatalogue,
     ];
-    const search = query.trim().toLocaleLowerCase();
-    const needle = search.replace(/\s+/g, "_");
-    if (!needle) return all;
+    if (!query.trim()) return all;
     return all
       .map((group) => ({
         name: group.name,
-        blocks: group.blocks.filter((id) =>
-          id.toLowerCase().includes(needle) ||
-          displayName({ name: id }).toLocaleLowerCase().includes(search)
-        ),
+        blocks: matchingBlockIds(query, group.blocks),
       }))
       .filter((group) => group.blocks.length > 0);
   }, [query, inBuild, catalogue, modCatalogue, locale]);
 
   const typed = query.trim();
-  const custom = typed && !typed.includes(" ") ? parseStateKey(normalizeName(typed)) : null;
+  const custom = typedBlock(typed,knownIds);
+  const exactMatch = groups.some(group => group.blocks.some(id =>
+    displayName({name:id}).toLocaleLowerCase() === typed.toLocaleLowerCase() ||
+    id.toLocaleLowerCase() === typed.toLocaleLowerCase() ||
+    id.toLocaleLowerCase() === `minecraft:${typed.toLocaleLowerCase()}`
+  ));
 
   return (
     <div className="picker-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>
@@ -113,7 +120,16 @@ export function BlockPicker({ title, onPick, onClose }: Props) {
             placeholder="Search, or type a block id such as oak_stairs[facing=east]"
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && custom) onPick(custom);
+              if (e.key === "Enter") {
+                if (exactMatch) {
+                  const id = groups.flatMap(group => group.blocks).find(id =>
+                    displayName({name:id}).toLocaleLowerCase() === typed.toLocaleLowerCase() ||
+                    id.toLocaleLowerCase() === typed.toLocaleLowerCase() ||
+                    id.toLocaleLowerCase() === `minecraft:${typed.toLocaleLowerCase()}`
+                  );
+                  if (id) onPick({name:id});
+                } else if(custom) onPick(custom.state);
+              }
               if (e.key === "Escape") onClose();
             }}
           />
@@ -123,11 +139,11 @@ export function BlockPicker({ title, onPick, onClose }: Props) {
         </div>
 
         <div className="picker-body">
-          {custom && groups.every((g) => !g.blocks.includes(custom.name)) && (
+          {custom && !exactMatch && groups.every((g) => !g.blocks.includes(custom.state.name)) && (
             <div className="picker-group">
-              <div className="eyebrow">Use exactly what you typed</div>
+              <div className="eyebrow">{custom.unrecognized ? "ID personalizado no reconocido — puede no existir" : "Usar identificador con propiedades"}</div>
               <div className="picker-grid">
-                <BlockButton state={custom} onPick={onPick} />
+                <BlockButton state={custom.state} onPick={onPick} />
               </div>
             </div>
           )}
@@ -144,7 +160,9 @@ export function BlockPicker({ title, onPick, onClose }: Props) {
           ))}
 
           {groups.length === 0 && !custom && (
-            <p style={{ color: "var(--mute)" }}>Nothing matches “{query}”.</p>
+            <p style={{ color: "var(--mute)" }}>
+              No se encontró «{query}». Buscá por nombre traducido o escribí un ID completo como minecraft:water.
+            </p>
           )}
         </div>
       </div>
