@@ -152,6 +152,12 @@ export function meshRegion(
                 // `cull ^ 1` is the opposite direction — the neighbour's face
                 // that would sit against this one.
                 if (blocks[neighbour].occludes[quad.cull ^ 1]) continue;
+                // Adjacent liquids share a seamless surface even if their
+                // palette indices differ (level, falling, flowing). A lower
+                // neighbour can still expose the higher side wall.
+                if (block.waterHeight !== undefined &&
+                    blocks[neighbour].waterHeight !== undefined &&
+                    blocks[neighbour].waterHeight! >= block.waterHeight - 1e-5) continue;
                 // A run of glass hides its own interior faces the way vanilla does.
                 if (neighbour === value && block.layer === 2) continue;
               }
