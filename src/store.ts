@@ -696,7 +696,7 @@ export const useStore = create<State & Actions>((set, get) => {
   /** Applies an edit, records it for undo, and tells the viewer what moved. */
   function commit(label: string, indices: Uint32Array, after: Uint16Array) {
     const build = get().build;
-    if (!build || indices.length === 0) return;
+    if (!build || indices.length === 0 || get().stylePreview !== null) return;
 
     // Fences, panes and walls keep their connections in the blockstate, and the
     // game recomputes them on every placement. The joins an edit implies — for
@@ -888,7 +888,7 @@ export const useStore = create<State & Actions>((set, get) => {
     set({ baking: true });
     try {
       const source = get().texturesEnabled ? pack : null;
-      if (source && isBedrockPack(basePack)) await prepareBedrockPalette(basePack!, build.palette);
+
       const mapped = get().stylePreview;
       // Replacing the palette for baking changes only geometry/texture
       // appearance. The original Build/data is never mutated or exported
@@ -900,6 +900,9 @@ export const useStore = create<State & Actions>((set, get) => {
               return mappedName ? {name:mappedName, properties:state.properties} : state;
             }), build.data, build.meta)
         : build;
+      if (source && isBedrockPack(basePack)) {
+        await prepareBedrockPalette(basePack!, previewBuild.palette);
+      }
       const baked = await bakePalette(previewBuild, source);
       if (source && isBedrockPack(basePack)) relayerPacks();
       // A newer bake started while this one was decoding textures.
@@ -1715,6 +1718,9 @@ export const useStore = create<State & Actions>((set, get) => {
     },
     setStylePreview: async (map) => {
       set({ stylePreview: map });
+      // The style panel is a material-only editor; no building tools can
+      // commit changes while it is open.
+      if (map !== null) set({ tool: "move" });
       await rebake();
     },
 
