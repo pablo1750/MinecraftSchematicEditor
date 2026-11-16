@@ -13,6 +13,8 @@ import { EmptyState } from "./ui/EmptyState";
 import { ServerProperties, type ServerPropertiesHandle } from "./ui/ServerProperties";
 import type { ConstruccionServidor, ModoGuardar } from "./server/catalog";
 import { Hotbar } from "./ui/Hotbar";
+import { StyleEditor } from "./ui/StyleEditor";
+
 import { toggleSection, useSectionOpen } from "./ui/Section";
 
 const TOOL_KEYS: Record<string, Tool> = {
@@ -66,6 +68,7 @@ export default function App() {
   // evita que un segundo Guardar genere una duplicación en el catálogo.
   const savedBuildRef = useRef<typeof build>(null);
   const [propertiesVisible, setPropertiesVisible] = useState(false);
+  const [stylesVisible, setStylesVisible] = useState(false);
   const sourceIsCurrent = serverSource !== null && build !== null &&
     ((serverLoadedFile !== null && fileName === serverLoadedFile) || savedBuildRef.current === build);
   const [dragging, setDragging] = useState(false);
@@ -273,12 +276,18 @@ export default function App() {
     >
       <TopBar propertiesVisible={propertiesVisible}
         onToggleProperties={() => setPropertiesVisible((visible) => !visible)}
-        onSave={() => serverPropertiesRef.current?.save()} />
+        onSave={() => serverPropertiesRef.current?.save()}
+        stylesEnabled={sourceIsCurrent && serverMode==="editar"}
+        onStyles={() => {setPropertiesVisible(false);setStylesVisible(v=>!v);}} />
       <DocTabs />
       {build && <ToolRail />}
 
       <main className="stage">
         <Viewport />
+        {stylesVisible && sourceIsCurrent && serverSource && build && serverMode==="editar" &&
+          <StyleEditor key={serverSource.categoria+"/"+serverSource.id}
+            source={serverSource} build={build}
+            onClose={() => setStylesVisible(false)} />}
       {build && <ServerProperties
         ref={serverPropertiesRef}
         visible={propertiesVisible}
@@ -302,6 +311,7 @@ export default function App() {
           </>
         ) : (
           <EmptyState onServerOpen={(entry, mode) => {
+            setStylesVisible(false);
             setServerSource(entry);
             setServerLoadedFile(useStore.getState().fileName);
             setServerMode(mode);
