@@ -52,6 +52,9 @@ jobs:
       - name: Test connected glass panes
         run: node scripts/test-glass-pane-connections.mjs
 
+      - name: Test Bedrock wall torches
+        run: node scripts/test-bedrock-wall-torches.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
