@@ -51,7 +51,7 @@ geometría original, la textura anterior y el alcance de selección del editor.
 
 ## Limitaciones iniciales
 
-- Movimiento peatonal con colisión geométrica aproximada. No hay mobs, puertas interactivas, natación, vuelo ni inventario.
+- Movimiento peatonal con colisión geométrica aproximada. No hay mobs, natación, vuelo ni inventario.
 - Se intenta iniciar sobre un suelo libre en la planta baja; las construcciones importadas no incluyen un punto de aparición.
 - Las colisiones usan las cajas simplificadas del editor, que no necesariamente coinciden con todos los modelos Bedrock de alta precisión.
 - La simulación está limitada al espacio de la construcción para evitar caer fuera del mundo.
