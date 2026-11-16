@@ -33,6 +33,13 @@ junto a la cámara y un color de niebla diurna. Estas opciones solo funcionan
 durante la simulación; al regresar al editor se restauran sus materiales, luz
 y cámara originales, evitando el coste permanente de las sombras.
 
+Los faroles normales y los de almas disponen de **cuatro focos**, uno por
+cada cara lateral de su cuerpo. Las antorchas tienen mayor intensidad y
+alcance; antorchas, faroles y fogatas convencionales utilizan colores
+cálidos ámbar/amarillo/anaranjados, mientras que las variantes de almas
+conservan su iluminación azul. Son posiciones y colores de luz para la
+simulación, no cambios a los bloques originales.
+
 Cada antorcha, farol, fogata encendida y demás bloque emisor detectado
 en la construcción genera su propia luz puntual. **No existe límite de ocho
 luces ni recorte por distancia al personaje**, incluso si la fuente está a
