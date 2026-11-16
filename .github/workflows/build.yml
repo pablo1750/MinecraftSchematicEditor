@@ -55,6 +55,9 @@ jobs:
       - name: Test Bedrock wall torches
         run: node scripts/test-bedrock-wall-torches.mjs
 
+      - name: Test connected fences
+        run: node scripts/test-fence-connections.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
