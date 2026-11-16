@@ -81,6 +81,8 @@ export interface BakedBlock {
   empty: boolean;
   /** False when this came from the built-in box table rather than a model. */
   fromModel: boolean;
+  /** Centre plus north/east/south/west arms; selected from neighbours at mesh time. */
+  paneParts?: BakedQuad[][];
 }
 
 export interface BakedPalette {
@@ -288,14 +290,14 @@ function coversFace(quad: BakedQuad): boolean {
 /* ----------------------------------------------------------- fallback path */
 
 /** Quads for the built-in box table, used when no pack supplies a model. */
-function bakeFallback(state: BlockState): { quads: BakedQuad[]; layer: RenderLayer; occludes: Uint8Array } {
+function bakeFallback(state: BlockState, overrideBoxes?: readonly Box[]): { quads: BakedQuad[]; layer: RenderLayer; occludes: Uint8Array } {
   const look = lookFor(state);
   const r = ((look.color >> 16) & 0xff) / 255;
   const g = ((look.color >> 8) & 0xff) / 255;
   const b = (look.color & 0xff) / 255;
   const quads: BakedQuad[] = [];
 
-  for (const box of look.boxes) {
+  for (const box of overrideBoxes ?? look.boxes) {
     const components = [box[0] * 16, box[1] * 16, box[2] * 16, box[3] * 16, box[4] * 16, box[5] * 16];
     for (let dir = 0; dir < 6; dir++) {
       const corners = FACE_CORNERS[dir];
@@ -385,6 +387,58 @@ function boxModel(texture: string, boxes: readonly Box[]): FlatModel {
   };
 }
 
+/* -------------------------------------------------------- connected panes */
+
+/** A glass pane is a 2-pixel centre plus up to four 2-pixel-thick arms. */
+function isGlassPane(id: string): boolean {
+  return id === "glass_pane" || id.endsWith("_stained_glass_pane");
+}
+
+const PANE_BOXES: readonly Box[] = [
+  [7 / 16, 0, 7 / 16, 9 / 16, 1, 9 / 16], // centre
+  [7 / 16, 0, 0, 9 / 16, 1, 7 / 16],      // north
+  [9 / 16, 0, 7 / 16, 1, 1, 9 / 16],      // east
+  [7 / 16, 0, 9 / 16, 9 / 16, 1, 1],      // south
+  [0, 0, 7 / 16, 7 / 16, 1, 9 / 16],      // west
+];
+
+/**
+ * Reuse the face-specific texture mapping of the current pack (Bedrock or
+ * Java), but create the geometry for five independent connected pieces.
+ * No new textures are required, and the existing shader can render them.
+ */
+function bakePaneParts(
+  state: BlockState,
+  resolved: ReturnType<typeof resolveState>,
+  textures: TextureArrayBuilder,
+): BakedQuad[][] {
+  if (!resolved?.[0]?.[0]?.model.elements.length) {
+    return PANE_BOXES.map((box) => bakeFallback(state, [box]).quads);
+  }
+  const placement = resolved[0][0];
+  const model = placement.model;
+  const reference = model.elements[0].faces;
+  const tint = tintFor(state.name, state.properties);
+  return PANE_BOXES.map((box) => {
+    const faces: ElementDef["faces"] = {};
+    for (const face of Object.keys(FACE_NAMES) as FaceName[]) {
+      const source = reference[face] ?? reference.north ?? reference.south;
+      if (!source) continue;
+      // UVs derive from the new piece's dimensions; full-block UVs must not
+      // be inherited from the old crossed-pane geometry.
+      faces[face] = { texture: source.texture, ...(source.tintindex === undefined ? {} : { tintindex: source.tintindex }) };
+    }
+    const element: ElementDef = {
+      from: [box[0] * 16, box[1] * 16, box[2] * 16],
+      to: [box[3] * 16, box[4] * 16, box[5] * 16],
+      faces,
+    };
+    const quads: BakedQuad[] = [];
+    bakeElement(element, { ...placement, x: 0, y: 0 }, model, textures, tint, quads);
+    return quads;
+  });
+}
+
 /* ------------------------------------------------------------------ entry */
 
 /** Blocks vanilla blends rather than alpha-tests. */
@@ -416,6 +470,22 @@ export async function bakePalette(build: Build, pack: ResourcePack | null): Prom
 
     const id = baseName(state.name);
     let resolved = pack ? resolveState(pack, state, modelCache) : null;
+
+    // Connections depend on each cell's neighbours, not on palette entries.
+    // Pre-bake five pieces here and select arms when meshing each position.
+    if (isGlassPane(id)) {
+      const paneParts = bakePaneParts(state, resolved, textures);
+      const fromModel = !!resolved?.[0]?.[0]?.model.elements.length;
+      if (!fromModel && pack) missing.push(state.name);
+      if (fromModel) textured = true;
+      blocks.push({
+        parts: [], single: null, paneParts,
+        occludes: new Uint8Array(6),
+        layer: fromModel ? 0 : 2,
+        ao: false, empty: false, fromModel,
+      });
+      continue;
+    }
 
     const fluid = FLUID_TEXTURES[id];
     if (!resolved && pack && fluid && pack.textures.has(fluid)) {
@@ -486,7 +556,9 @@ export async function bakePalette(build: Build, pack: ResourcePack | null): Prom
   // textures it actually uses, so both that and occlusion wait for decoding.
   for (const block of blocks) {
     if (!block.fromModel) continue;
-    const quads = block.single ?? block.parts.flatMap((options) => options[0] ?? []);
+    const quads = block.paneParts
+      ? block.paneParts.flat()
+      : block.single ?? block.parts.flatMap((options) => options[0] ?? []);
     if (quads.length === 0) continue;
 
     if (block.layer !== 2) {
