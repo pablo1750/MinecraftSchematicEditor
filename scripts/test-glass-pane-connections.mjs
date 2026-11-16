@@ -10,6 +10,32 @@ const server = await createServer({
 try {
   const { meshRegion } = await server.ssrLoadModule("/src/render/mesher.ts");
   const { paneConnectionMask } = await server.ssrLoadModule("/src/core/connect.ts");
+  const { paneTextureFace } = await server.ssrLoadModule("/src/render/bake.ts");
+  const bedrockFaces = {
+    north: { texture:"minecraft:block/bedrock/glass" },
+    south: { texture:"minecraft:block/bedrock/glass" },
+    east: { texture:"minecraft:block/bedrock/glass_pane_top" },
+    west: { texture:"minecraft:block/bedrock/glass_pane_top" },
+    up: { texture:"minecraft:block/bedrock/glass" },
+    down: { texture:"minecraft:block/bedrock/glass" },
+  };
+  for (const face of ["north","south","east","west"]) {
+    assert.equal(paneTextureFace(bedrockFaces,face)?.texture,
+      "minecraft:block/bedrock/glass",
+      "the transparent glass face must render from all four directions");
+  }
+  for (const face of ["up","down"]) {
+    assert.equal(paneTextureFace(bedrockFaces,face)?.texture,
+      "minecraft:block/bedrock/glass_pane_top",
+      "the opaque pane edge must only appear on horizontal caps");
+  }
+  const javaFaces = {
+    north:{ texture:"minecraft:block/glass_pane" },
+    east:{ texture:"minecraft:block/glass_pane_edge" },
+  };
+  assert.equal(paneTextureFace(javaFaces,"east")?.texture,"minecraft:block/glass_pane_edge",
+    "Java pack face selection remains unchanged");
+
 
   const AIR = { name: "minecraft:air" };
   const PANE = { name: "minecraft:glass_pane" };
