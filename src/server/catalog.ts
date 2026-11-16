@@ -117,7 +117,7 @@ export interface EstiloEditor {
 }
 export interface EstilosRespuesta {
   estilos_editor: EstiloEditor[];
-  estilos_importados: {nombre:string;solo_mapa:boolean}[];
+  estilos_importados: {nombre:string;solo_mapa:boolean;reemplazos:Record<string,string>}[];
 }
 export async function consultarEstilos(source: ConstruccionServidor):Promise<EstilosRespuesta> {
   const q=new URLSearchParams({
@@ -132,7 +132,7 @@ export async function consultarEstilos(source: ConstruccionServidor):Promise<Est
 }
 export async function guardarEstilo(
   source:ConstruccionServidor,
-  style:Pick<EstiloEditor,"nombre"|"reemplazos"> & {id?:string},
+  style:Pick<EstiloEditor,"nombre"|"reemplazos"> & {id?:string;sobrescribir_importado?:boolean},
 ):Promise<EstiloEditor> {
   const res=await fetch("/api/construcciones?accion=editor_estilo_guardar",{
     method:"POST",credentials:"same-origin",
