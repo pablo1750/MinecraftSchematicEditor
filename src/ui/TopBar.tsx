@@ -107,6 +107,9 @@ export function TopBar({ propertiesVisible, onToggleProperties, onSave, onStyles
           Simular
         </button>}
       {build && <button className="btn btn-outline" type="button"
+        onClick={() => useStore.getState().enterPhotoMode()}
+        title="Cámara libre, luces configurables y captura PNG">Foto</button>}
+      {build && <button className="btn btn-outline" type="button"
         onClick={onStyles} disabled={!stylesEnabled}
         title={stylesEnabled ? "Editar estilos de materiales" : "Guardá primero la construcción en el catálogo"}>
           Estilos
