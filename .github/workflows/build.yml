@@ -73,6 +73,9 @@ jobs:
       - name: Test doors and temporary simulation interactions
         run: node scripts/test-door-interactions.mjs
 
+      - name: Test all building light sources
+        run: node scripts/test-emissive-lights.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
