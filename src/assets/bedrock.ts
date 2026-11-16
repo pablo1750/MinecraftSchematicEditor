@@ -212,6 +212,71 @@ export function doorElements(
   }];
 }
 
+/**
+ * Fence gates are not fences: they have two edge posts and a pair of movable
+ * rail leaves. Model geometry in local X (the closed gate spans east/west),
+ * then rotate it for east/west-facing gates. No neighbour or imported state
+ * is changed. "in_wall" lowers the complete gate by three pixels.
+ */
+export function fenceGateElements(
+  texture:string,
+  properties:Record<string,string> | undefined,
+):ElementDef[] {
+  const facing=properties?.facing ?? "north";
+  const alongZ=facing==="east" || facing==="west";
+  const opened=properties?.open==="true" || properties?.open_bit==="true" ||
+    properties?.open_bit==="1";
+  const lowered=properties?.in_wall==="true" || properties?.in_wall_bit==="true" ||
+    properties?.in_wall_bit==="1";
+  const yShift=lowered ? -3 : 0;
+  type Bounds=[number,number,number,number,number,number];
+  const boxes:Bounds[]=[
+    [0,5,6,2,16,10], // left hinge post
+    [14,5,6,16,16,10], // right hinge post
+  ];
+  if(!opened){
+    // Two uninterrupted rails between the posts, with central braces.
+    boxes.push(
+      [2,6,7,14,9,9],
+      [2,12,7,14,15,9],
+      [6,6,6,8,15,10],
+      [8,6,6,10,15,10],
+    );
+  }else{
+    // Each leaf swings back against its hinge, leaving the passage open.
+    const toSouth=facing==="north" || facing==="east";
+    const z0=toSouth?8:2;
+    const z1=toSouth?14:8;
+    boxes.push(
+      [1,6,z0,3,9,z1],
+      [1,12,z0,3,15,z1],
+      [13,6,z0,15,9,z1],
+      [13,12,z0,15,z1===14?15:15,z1],
+    );
+  }
+  const face=(uv:[number,number,number,number])=>({texture,uv});
+  return boxes.map(([x0,y0,z0,x1,y1,z1]):ElementDef=>{
+    const from: [number,number,number]=alongZ
+      ? [z0,y0+yShift,x0] : [x0,y0+yShift,z0];
+    const to: [number,number,number]=alongZ
+      ? [z1,y1+yShift,x1] : [x1,y1+yShift,z1];
+    const broadX=(to[0]-from[0])>(to[2]-from[2]);
+    const width=Math.min(16,broadX?to[0]-from[0]:to[2]-from[2]);
+    const height=to[1]-from[1];
+    const uv=face([0,0,width,height]);
+    const thin=face([0,0,Math.min(16,broadX?to[2]-from[2]:to[0]-from[0]),height]);
+    const top=face([0,0,width,Math.min(16,broadX?to[2]-from[2]:to[0]-from[0])]);
+    return {
+      from,to,
+      faces:{
+        north:broadX?uv:thin,south:broadX?uv:thin,
+        east:broadX?thin:uv,west:broadX?thin:uv,
+        up:top,down:top,
+      },
+    };
+  });
+}
+
 /** Generate compatible models for the current build; preserve the existing block geometry. */
 export async function prepareBedrockPalette(pack:ResourcePack,palette:BlockState[]):Promise<void> {
   const meta=metadata.get(pack);
@@ -234,6 +299,7 @@ export async function prepareBedrockPalette(pack:ResourcePack,palette:BlockState
     if (!valid) continue;
     // Doors need their own upper/lower texture rather than generic
     // Bedrock's "door_lower"/"door_upper" arrays' first (oak) entry.
+    const isFenceGate=id.endsWith("_fence_gate");
     const isDoor=id.endsWith("_door") && !id.endsWith("_trapdoor");
     const half: "upper" | "lower" =
       state.properties?.half==="upper" || state.properties?.upper_block_bit==="true" ||
@@ -254,6 +320,8 @@ export async function prepareBedrockPalette(pack:ResourcePack,palette:BlockState
           state.properties?.hanging_bit==="true" || state.properties?.hanging_bit==="1")
       : isDoor && doorTexture
       ? doorElements(doorTexture,state.properties)
+      : isFenceGate && atlas
+      ? fenceGateElements(atlas,state.properties)
       : lookFor(state).boxes.map(box=>{
       const from:[number,number,number]=[box[0]*16,box[1]*16,box[2]*16];
       const to:[number,number,number]=[box[3]*16,box[4]*16,box[5]*16];
