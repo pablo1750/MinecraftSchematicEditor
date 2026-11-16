@@ -18,6 +18,7 @@ const SAVE_FORMATS: { id: SaveFormat; label: string }[] = [
 export function TopBar({ propertiesVisible, onToggleProperties, onSave, onStyles, stylesEnabled }: { propertiesVisible: boolean; onToggleProperties: () => void; onSave: () => void; onStyles: () => void; stylesEnabled: boolean }) {
   const locale = useLocale();
   const build = useStore((s) => s.build);
+  const styleEditing = useStore((s) => s.styleEditing);
   const fileName = useStore((s) => s.fileName);
   const undoStack = useStore((s) => s.undoStack);
   const redoStack = useStore((s) => s.redoStack);
@@ -95,8 +96,8 @@ export function TopBar({ propertiesVisible, onToggleProperties, onSave, onStyles
       <span className="topbar-spacer" />
 
       {build && (
-        <button className="btn btn-primary" type="button" onClick={onSave}
-          title="Guardar construcción en el servidor" aria-label="Guardar construcción">
+        <button className="btn btn-primary" type="button" onClick={onSave} disabled={styleEditing}
+          title={styleEditing ? "Guardá las modificaciones desde el panel Estilos" : "Guardar construcción en el servidor"} aria-label="Guardar construcción">
           <IconSave /> Guardar
         </button>
       )}
