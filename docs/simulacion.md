@@ -27,18 +27,24 @@ El simulador **no escribe bloques**, no cambia dimensiones ni guarda el esquema.
 ## Iluminación mejorada
 
 Al entrar en simulación, el renderer utiliza materiales Lambert con luz ambiental
-hemisférica y luz solar direccional, y activa un mapa de sombras suavizadas de
+hemisférica cálida **más una luz ambiental uniforme** que ilumina paredes
+interiores incluso cuando el techo bloquea el sol. La iluminación global no
+depende de la cercanía a una antorcha. Se activa un mapa de sombras suavizadas de
 1024×1024 cerca del personaje. También incorpora una luz de relleno tenue
 junto a la cámara y un color de niebla diurna. Estas opciones solo funcionan
 durante la simulación; al regresar al editor se restauran sus materiales, luz
 y cámara originales, evitando el coste permanente de las sombras.
 
 Los faroles normales y los de almas disponen de **cuatro focos**, uno por
-cada cara lateral de su cuerpo. Las antorchas tienen mayor intensidad y
-alcance; antorchas, faroles y fogatas convencionales utilizan colores
-cálidos ámbar/amarillo/anaranjados, mientras que las variantes de almas
-conservan su iluminación azul. Son posiciones y colores de luz para la
-simulación, no cambios a los bloques originales.
+cada cara lateral de su cuerpo. Se bajaron las cuatro fuentes hacia el cuerpo
+del farol y se redujo su intensidad individual para suavizar las manchas
+saturadas en techos y paredes. La antorcha de suelo emite desde la punta de
+la llama y la antorcha de pared desplaza el foco hasta la punta inclinada
+según su orientación. Con la iluminación general más equilibrada, las
+antorchas mantienen una luz cálida perceptible sin puntos quemados.
+Fogatas, antorchas y faroles normales utilizan ámbar/amarillo/anaranjado,
+mientras que las variantes de almas conservan el azul. Estos cambios
+afectan solo a la simulación, nunca a los bloques originales.
 
 Cada antorcha, farol, fogata encendida y demás bloque emisor detectado
 en la construcción genera su propia luz puntual. **No existe límite de ocho
