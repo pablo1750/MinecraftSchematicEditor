@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { displayName, type BlockState } from "../core/model";
+import { cssColor } from "../core/blockLook";
+import { BlockPicker } from "./BlockPicker";
 import type { Build } from "../core/model";
 import { useStore } from "../store";
 import {
@@ -38,6 +42,7 @@ export function StyleEditor({source,build,onClose}:Props) {
   const [map,setMap]=useState<Record<string,string>>({});
   const [baseline,setBaseline]=useState(JSON.stringify({name:"Original",map:{}}));
   const [filter,setFilter]=useState("");
+  const [pickerFrom,setPickerFrom]=useState<string | null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
@@ -114,6 +119,13 @@ export function StyleEditor({source,build,onClose}:Props) {
     setCreatedFromImported(false);
     void useStore.getState().setStylePreview(values);
     setError("");setMessage("");
+  }
+  function pickReplacement(state:BlockState){
+    if(!pickerFrom)return;
+    // The style map replaces block types, not individual blockstate variants.
+    // Blockstate properties remain on their original cells.
+    update(pickerFrom,state.name);
+    setPickerFrom(null);
   }
   async function save(){
     if(selected.type==="original" || busy)return;
@@ -192,10 +204,21 @@ export function StyleEditor({source,build,onClose}:Props) {
       </label>
       <div className="style-editor-materials">
         {visible.map(([from,count])=><div key={from} className="style-editor-material">
-          <label title={from}>{from.replace(/^minecraft:/,"")} <small>({count})</small></label>
-          <input aria-label={"Reemplazar "+from} value={map[from]??""}
-            disabled={readOnly} placeholder="Sin cambios"
-            onChange={e=>update(from,e.target.value)} />
+          <label title={from}>{displayName({name:from})} <small>({count})</small></label>
+          <div className="style-editor-replacement">
+            <button type="button" className="style-editor-choose"
+              title={map[from] ? map[from] : "Elegir material de reemplazo"}
+              aria-label={"Elegir reemplazo para "+from}
+              disabled={readOnly}
+              onClick={()=>setPickerFrom(from)}>
+              <i className="swatch" style={{background:map[from] ? cssColor({name:map[from]}) : "var(--line)"}} />
+              <span>{map[from] ? displayName({name:map[from]}) : "Sin cambios"}</span>
+            </button>
+            {map[from] && !readOnly && <button type="button" className="btn style-editor-clear"
+              aria-label={"Restaurar material original "+from}
+              title="Sin reemplazo (usar material original)"
+              onClick={()=>update(from,"")}>×</button>}
+          </div>
         </div>)}
         {visible.length===0 && <p>Sin materiales coincidentes.</p>}
       </div>
@@ -208,5 +231,15 @@ export function StyleEditor({source,build,onClose}:Props) {
         {error && <p role="alert" className="server-catalog-error">{error}</p>}
       </div>
     </>}
+  {pickerFrom && createPortal(
+    <div className="style-picker-host">
+      <BlockPicker
+        title={"Reemplazar "+displayName({name:pickerFrom})+" con"}
+        onPick={pickReplacement}
+        onClose={()=>setPickerFrom(null)}
+      />
+    </div>,
+    document.body,
+  )}
   </aside>;
 }
