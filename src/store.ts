@@ -1474,6 +1474,10 @@ export const useStore = create<State & Actions>((set, get) => {
    * step of structural undo.
    */
   function recutBuild(label: string, next: Build) {
+    if (get().styleEditing) {
+      set({notice:"No se pueden cambiar las dimensiones de un estilo."});
+      return;
+    }
     const current = get().build;
     if (!current) return;
     installBuild(next);
@@ -1734,6 +1738,7 @@ export const useStore = create<State & Actions>((set, get) => {
       await rebake();
     },
     beginStyleEditing: (map, changes, writable = false) => {
+      clearTimeout(autosaveTimer);
       if (!styleOriginal) styleOriginal = get().build;
       if (!styleOriginal) return;
       const {base,working}=composeStyle(styleOriginal,map,changes);
@@ -1830,6 +1835,7 @@ export const useStore = create<State & Actions>((set, get) => {
     },
 
     openInNewTab: async (file) => {
+      if (get().styleEditing) return;
       // A pack is never a document, however it arrived here.
       if (PACK_EXTENSIONS.test(file.name)) return get().loadResourcePack(file);
       // Nothing open to sit beside: this is just opening a file.
@@ -1854,6 +1860,7 @@ export const useStore = create<State & Actions>((set, get) => {
     },
 
     newTab: (width, height, length) => {
+      if (get().styleEditing) return;
       if (!get().build) return get().newBuild(width, height, length);
       try {
         adoptBuild(createBuild(width, height, length, { format: "new" }), null, true);
@@ -2002,6 +2009,7 @@ export const useStore = create<State & Actions>((set, get) => {
     },
 
     restoreSession: () => {
+      if (get().styleEditing) return;
       const snapshot = get().session;
       if (!snapshot) return;
       adoptBuild(buildFromSession(snapshot), snapshot.fileName);
@@ -2016,6 +2024,7 @@ export const useStore = create<State & Actions>((set, get) => {
     // surviving a reload, not a workspace, and a second tab is usually a piece
     // being cut to size rather than something you'd mourn.
     flushAutosave: () => {
+      if (get().styleEditing) return;
       clearTimeout(autosaveTimer);
       const { build, fileName } = get();
       if (build) void writeSession(build, fileName);
