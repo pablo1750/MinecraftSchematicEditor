@@ -61,6 +61,9 @@ jobs:
       - name: Test Bedrock doors and hinges
         run: node scripts/test-bedrock-doors.mjs
 
+      - name: Test Bedrock fence gates
+        run: node scripts/test-bedrock-fence-gates.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
