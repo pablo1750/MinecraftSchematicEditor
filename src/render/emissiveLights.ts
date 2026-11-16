@@ -30,11 +30,11 @@ export function emissionFor(state:BlockState):Emission|null {
     if(prop.lit!=="true")return null;
     return {color:WARM_FIRE,intensity:4.0,radius:11};
   }
-  if(id==="lantern")return {color:WARM_LANTERN,intensity:2.0,radius:10};
-  if(id==="soul_lantern")return {color:SOUL_BLUE,intensity:1.8,radius:10};
-  if(id==="torch" || id==="wall_torch")return {color:WARM_TORCH,intensity:4.6,radius:13};
+  if(id==="lantern")return {color:WARM_LANTERN,intensity:0.85,radius:9};
+  if(id==="soul_lantern")return {color:SOUL_BLUE,intensity:0.8,radius:9};
+  if(id==="torch" || id==="wall_torch")return {color:WARM_TORCH,intensity:3.25,radius:12};
   if(id==="soul_torch" || id==="soul_wall_torch")
-    return {color:SOUL_BLUE,intensity:4.0,radius:12};
+    return {color:SOUL_BLUE,intensity:3.0,radius:11};
   if(id==="campfire")return {color:WARM_FIRE,intensity:5.2,radius:15};
   if(id==="soul_campfire")return {color:SOUL_BLUE,intensity:4.7,radius:14};
   if(id==="jack_o_lantern" || id==="shroomlight" || id==="glowstone" ||
@@ -69,8 +69,9 @@ export function emissionSamplesFor(state:BlockState):EmissionSample[] {
     // The four sources sit just beyond each side of the lantern housing.
     // Keep them relatively weak individually: together they illuminate
     // more evenly without quadrupling the perceived brightness too much.
+    // Match the emitting body rather than the hanging handle / ceiling.
     const y=state.properties?.hanging==="true" || state.properties?.hanging_bit==="true"
-      ? 0.55 : 0.42;
+      ? 0.27 : 0.20;
     return [
       {dx: 0.24,dy:y,dz:0,...profile},
       {dx:-0.24,dy:y,dz:0,...profile},
@@ -78,7 +79,18 @@ export function emissionSamplesFor(state:BlockState):EmissionSample[] {
       {dx:0,dy:y,dz:-0.24,...profile},
     ];
   }
-  const height=id.includes("torch") ? 0.67 :
+  if(id==="wall_torch" || id==="soul_wall_torch" || id==="redstone_wall_torch"){
+    // Approximate the rotated top of the Bedrock 2×10 px wall-torch model.
+    // The light follows its flame, offset from the supporting wall.
+    const facing=state.properties?.facing ?? "north";
+    const offsets:Record<string,[number,number,number]>={
+      north:[0,0.79,0.14],south:[0,0.79,-0.14],
+      east:[-0.14,0.75,0],west:[0.14,0.75,0],
+    };
+    const [dx,dy,dz]=offsets[facing] ?? offsets.north;
+    return [{dx,dy,dz,...profile}];
+  }
+  const height=id.includes("torch") ? 0.83 :
     id.includes("campfire") ? 0.35 : 0.65;
   return [{dx:0,dy:height,dz:0,...profile}];
 }
