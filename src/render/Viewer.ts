@@ -523,7 +523,8 @@ export class Viewer {
     const previous = this.textureUniform.value;
     this.baked = baked;
     this.textureUniform.value = baked.texture;
-    if (previous && previous !== baked.texture) previous.dispose();
+    if (previous && previous !== baked.texture &&
+        previous !== this.simulationOriginalBaked?.texture) previous.dispose();
     this.invalidateAll();
   }
 
@@ -1664,12 +1665,13 @@ export class Viewer {
   private async interactWithDoor(){
     if(!this.simulation || this.doorBusy || !this.build)return;
     const build=this.build;
-    this.raycaster.setFromCamera(new THREE.Vector2(0,0),this.camera);
-    this.raycaster.near=0;
-    this.raycaster.far=4.5;
+    const interactionRaycaster=new THREE.Raycaster();
+    interactionRaycaster.setFromCamera(new THREE.Vector2(0,0),this.camera);
+    interactionRaycaster.near=0;
+    interactionRaycaster.far=4.5;
     const meshes:THREE.Mesh[]=[];
     for(const chunk of this.chunks)for(const mesh of chunk.meshes)if(mesh)meshes.push(mesh);
-    const hit=this.raycaster.intersectObjects(meshes,false)[0];
+    const hit=interactionRaycaster.intersectObjects(meshes,false)[0];
     if(!hit || hit.faceIndex==null)return;
     const quadBlocks=hit.object.userData.quadBlocks as Uint32Array|undefined;
     const index=quadBlocks?.[hit.faceIndex>>1];
