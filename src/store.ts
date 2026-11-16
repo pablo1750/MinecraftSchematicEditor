@@ -47,6 +47,7 @@ import {
 import { modLabel } from "./core/blockCatalog";
 import { loadBedrockPack, prepareBedrockPalette, isBedrockPack } from "./assets/bedrock";
 import { bakePalette } from "./render/bake";
+import { composeStyle, styleDifferences, type StyleCell } from "./core/styleLayers";
 import type { BlockHit, ThroughSelection, Viewer } from "./render/Viewer";
 
 export type Tool =
@@ -149,6 +150,7 @@ interface State {
   fileName: string | null;
   /** Visual-only material substitutions for the selected editor style. */
   stylePreview: Record<string, string> | null;
+  styleEditing: boolean;
   /** Transient one-line message: what a canvas edit did, or why it couldn't. */
   notice: string | null;
 
@@ -356,6 +358,10 @@ interface Actions {
   clearResourcePack: () => Promise<void>;
   setTexturesEnabled: (enabled: boolean) => Promise<void>;
   setStylePreview: (map: Record<string,string> | null) => Promise<void>;
+  beginStyleEditing: (map:Record<string,string>, changes:StyleCell[]) => void;
+  changeStyleMap: (map:Record<string,string>) => void;
+  styleChanges: () => StyleCell[];
+  endStyleEditing: () => void;
   /** Stacks a mod jar over the base pack, adding its blocks to the picker. */
   addModPack: (file: File) => Promise<void>;
   /** As {@link addModPack}, for a jar the dev server found in an instance. */
@@ -610,6 +616,8 @@ let autoLoadStarted = false;
 /** Palette length the current bake covers; a longer palette needs a rebake. */
 let bakedCount = 0;
 let bakeToken = 0;
+let styleOriginal: Build | null = null;
+let styleBaseline: Build | null = null;
 
 const PACK_EXTENSIONS = /\.(jar|zip)$/i;
 
@@ -696,7 +704,7 @@ export const useStore = create<State & Actions>((set, get) => {
   /** Applies an edit, records it for undo, and tells the viewer what moved. */
   function commit(label: string, indices: Uint32Array, after: Uint16Array) {
     const build = get().build;
-    if (!build || indices.length === 0 || get().stylePreview !== null) return;
+    if (!build || indices.length === 0 || (get().stylePreview !== null && !get().styleEditing)) return;
 
     // Fences, panes and walls keep their connections in the blockstate, and the
     // game recomputes them on every placement. The joins an edit implies — for
@@ -716,7 +724,7 @@ export const useStore = create<State & Actions>((set, get) => {
     record(label, indices, before, after);
     invalidate(indices);
     refreshHighlight();
-    scheduleAutosave();
+    if (!get().styleEditing) scheduleAutosave();
   }
 
   /**
@@ -1341,6 +1349,7 @@ export const useStore = create<State & Actions>((set, get) => {
     if (!record || !state.build) return;
     // A resize hands back a different Build object, so the build is copied over
     // too rather than assumed to be the one the record already holds.
+    if (get().styleEditing) return; // preserve the original document while editing its style
     record.build = state.build;
     record.fileName = state.fileName;
     record.layerLimit = state.layerLimit;
@@ -1506,6 +1515,7 @@ export const useStore = create<State & Actions>((set, get) => {
     error: null,
     fileName: null,
     stylePreview: null,
+    styleEditing: false,
     notice: null,
 
     tool: "move",
@@ -1718,13 +1728,48 @@ export const useStore = create<State & Actions>((set, get) => {
     },
     setStylePreview: async (map) => {
       set({ stylePreview: map });
-      // The style panel is a material-only editor; no building tools can
-      // commit changes while it is open.
       if (map !== null) set({ tool: "move" });
       await rebake();
     },
+    beginStyleEditing: (map, changes) => {
+      if (!styleOriginal) styleOriginal = get().build;
+      if (!styleOriginal) return;
+      const {base,working}=composeStyle(styleOriginal,map,changes);
+      styleBaseline=base;
+      installBuild(working);
+      set({build:working,styleEditing:true,stylePreview:null,
+        undoStack:[],redoStack:[],structuralUndo:null,
+        revision:get().revision+1,selectedMaterial:null,
+        notice:"Modo estilo: editá los bloques sin alterar la construcción original."});
+      viewer?.setLayerLimit(get().layerLimit);
+      void rebake();
+    },
+    changeStyleMap: (map) => {
+      if (!styleOriginal || !styleBaseline || !get().build) return;
+      const changes=styleDifferences(styleBaseline,get().build!);
+      get().beginStyleEditing(map,changes);
+    },
+    styleChanges: () => {
+      const current=get().build;
+      return styleBaseline && current ? styleDifferences(styleBaseline,current) : [];
+    },
+    endStyleEditing: () => {
+      if (!styleOriginal) return;
+      const original=styleOriginal;
+      styleOriginal=null;
+      styleBaseline=null;
+      installBuild(original);
+      const record=docRecords.find(doc=>doc.id===get().activeDoc);
+      set({build:original,styleEditing:false,stylePreview:null,
+        undoStack:record?.undoStack??[],redoStack:record?.redoStack??[],
+        structuralUndo:record?.structuralUndo??null,
+        selectedMaterial:null,revision:get().revision+1,
+        notice:"Construcción original restaurada."});
+      void rebake();
+    },
 
     openFile: async (file) => {
+      if (get().styleEditing) return;
       set({ status: "loading", error: null, fileName: file.name });
       try {
         adoptBuild(await loadBuild(file), file.name);
@@ -1737,6 +1782,7 @@ export const useStore = create<State & Actions>((set, get) => {
     },
 
     importFile: async (file) => {
+      if (get().styleEditing) return;
       // A pack is never a thing to stamp, however it arrived here.
       if (PACK_EXTENSIONS.test(file.name)) return get().loadResourcePack(file);
       // Nothing to import into: opening it is what was meant.
@@ -1818,6 +1864,7 @@ export const useStore = create<State & Actions>((set, get) => {
     },
 
     switchDoc: (id) => {
+      if (get().styleEditing) return;
       if (id === get().activeDoc) return;
       const record = docRecords.find((doc) => doc.id === id);
       if (!record) return;
@@ -1828,6 +1875,7 @@ export const useStore = create<State & Actions>((set, get) => {
     },
 
     closeDoc: (id) => {
+      if (get().styleEditing) return;
       const index = docRecords.findIndex((doc) => doc.id === id);
       if (index < 0) return;
       const wasActive = get().activeDoc === id;
@@ -1867,6 +1915,7 @@ export const useStore = create<State & Actions>((set, get) => {
     },
 
     newBuild: (width, height, length) => {
+      if (get().styleEditing) return;
       try {
         adoptBuild(createBuild(width, height, length, { format: "new" }), null);
         set({ tool: "place", notice: "Empty canvas. Pick a paint material and start placing." });
@@ -1972,12 +2021,14 @@ export const useStore = create<State & Actions>((set, get) => {
 
     /** Closes the tab being worked in; the last one leaves the empty state. */
     closeBuild: () => {
+      if (get().styleEditing) return;
       const active = get().activeDoc;
       if (active) return get().closeDoc(active);
       emptyOut();
     },
 
     download: async (format) => {
+      if (get().styleEditing) return;
       const build = get().build;
       if (!build) return;
       const blob = await saveBuild(build, format);
@@ -2797,7 +2848,7 @@ export const useStore = create<State & Actions>((set, get) => {
         revision: get().revision + 1,
       });
       refreshHighlight();
-      scheduleAutosave();
+      if (!get().styleEditing) scheduleAutosave();
     },
 
     redo: () => {
@@ -2813,7 +2864,7 @@ export const useStore = create<State & Actions>((set, get) => {
         revision: get().revision + 1,
       });
       refreshHighlight();
-      scheduleAutosave();
+      if (!get().styleEditing) scheduleAutosave();
     },
 
     materials: () => {
