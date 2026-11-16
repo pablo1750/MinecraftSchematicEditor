@@ -46,6 +46,54 @@ export async function loadBedrockPack():Promise<ResourcePack> {
   metadata.set(pack,{blocks,terrain:terrain.texture_data,attempted:new Set()});
   return pack;
 }
+/**
+ * The lantern PNG is a small UV atlas, not a tileable block face. Map its
+ * individual body, cap and handle regions instead of stretching the entire
+ * image over the old stand-in box. Use the existing model baker and shader.
+ */
+function lanternElements(texture:string,hanging:boolean):ElementDef[] {
+  const offset=hanging ? 1 : 0;
+  const face=(uv:[number,number,number,number])=>({texture,uv});
+  const main:ElementDef={
+    from:[5,offset,5],to:[11,7+offset,11],
+    faces:{
+      down:{...face([0,9,6,15]),...(!hanging?{cullface:"down" as FaceName}:{})},
+      up:face([0,9,6,15]),
+      north:face([0,2,6,9]),south:face([0,2,6,9]),
+      east:face([0,2,6,9]),west:face([0,2,6,9]),
+    },
+  };
+  const cap:ElementDef={
+    from:[6,7+offset,6],to:[10,9+offset,10],
+    faces:{
+      ...(hanging?{down:face([1,10,5,14])}:{}),
+      up:face([1,10,5,14]),
+      north:face([1,0,5,2]),south:face([1,0,5,2]),
+      east:face([1,0,5,2]),west:face([1,0,5,2]),
+    },
+  };
+  const start=hanging ? 11 : 9;
+  const cross1:ElementDef={
+    from:[6.5,start,8],to:[9.5,hanging?15:11,8],
+    rotation:{origin:[8,8,8],axis:"y",angle:45},
+    shade:false,
+    faces:{
+      north:face(hanging?[14,1,11,5]:[14,1,11,3]),
+      south:face(hanging?[11,1,14,5]:[11,1,14,3]),
+    },
+  };
+  const cross2:ElementDef={
+    from:[8,hanging?10:9,6.5],to:[8,hanging?16:11,9.5],
+    rotation:{origin:[8,8,8],axis:"y",angle:45},
+    shade:false,
+    faces:{
+      east:face(hanging?[11,6,14,12]:[11,10,14,12]),
+      west:face(hanging?[14,6,11,12]:[14,10,11,12]),
+    },
+  };
+  return [main,cap,cross1,cross2];
+}
+
 /** Generate compatible models for the current build; preserve the existing block geometry. */
 export async function prepareBedrockPalette(pack:ResourcePack,palette:BlockState[]):Promise<void> {
   const meta=metadata.get(pack);
@@ -66,7 +114,13 @@ export async function prepareBedrockPalette(pack:ResourcePack,palette:BlockState
       needed.add(path);
     }
     if (!valid) continue;
-    const elements:ElementDef[]=lookFor(state).boxes.map(box=>{
+    // Lanterns use a single PNG atlas with per-part UVs, not generic block mapping.
+    const isLantern=id==="lantern" || id==="soul_lantern";
+    const atlas=keys.up;
+    const elements:ElementDef[]=isLantern && atlas
+      ? lanternElements(atlas,state.properties?.hanging==="true" ||
+          state.properties?.hanging_bit==="true" || state.properties?.hanging_bit==="1")
+      : lookFor(state).boxes.map(box=>{
       const from:[number,number,number]=[box[0]*16,box[1]*16,box[2]*16];
       const to:[number,number,number]=[box[3]*16,box[4]*16,box[5]*16];
       const directions:ElementDef["faces"]={};
