@@ -35,7 +35,7 @@ try{
   assert.equal(body.y,1,"gravity keeps the player on floor");
   assert.equal(body.grounded,true,"floor contact");
   body=advanceWalker(b,body,{...idle,forward:1},1/60);
-  assert.ok(body.z<spawn.z,"W goes toward negative Z");
+  assert.ok(body.z<spawn.z,`W goes toward negative Z: spawn=${JSON.stringify(spawn)} moved=${JSON.stringify(body)} col=${walkerCollides(b,body.x,body.y,body.z)}`);
   let running={...spawn},walking={...spawn};
   for(let i=0;i<30;i++){
     running=advanceWalker(b,running,{...idle,forward:1,sprint:true},1/60);
