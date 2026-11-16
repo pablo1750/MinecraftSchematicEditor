@@ -68,19 +68,21 @@ export function walkerCollides(build:Build,x:number,y:number,z:number):boolean {
   return false;
 }
 
-/** Pick a safe standing position near the desired X/Z, preferring upper floors. */
+/** Pick a safe standing position near the desired X/Z, preferring the ground floor. */
 export function findWalkSpawn(build:Build,wantedX:number,wantedZ:number):Walker {
   const x=Math.max(WALK_RADIUS+.01,Math.min(build.width-WALK_RADIUS-.01,wantedX));
   const z=Math.max(WALK_RADIUS+.01,Math.min(build.length-WALK_RADIUS-.01,wantedZ));
-  const candidates:[[number,number],...Array<[number,number]>]=[
-    [x,z],[build.width/2,build.length/2],
-  ];
+  const cameraInside=wantedX>=1 && wantedX<build.width-1 &&
+    wantedZ>=1 && wantedZ<build.length-1;
+  const candidates:Array<[number,number]>=cameraInside
+    ? [[x,z],[build.width/2,build.length/2]]
+    : [[build.width/2,build.length/2],[x,z]];
   for(let dz=-4;dz<=4;dz++)for(let dx=-4;dx<=4;dx++){
     candidates.push([Math.max(.3,Math.min(build.width-.3,x+dx)),
       Math.max(.3,Math.min(build.length-.3,z+dz))]);
   }
   for(const [px,pz] of candidates){
-    for(let y=build.height;y>=0;y-=.5){
+    for(let y=0;y<=build.height;y+=.5){
       if(walkerCollides(build,px,y,pz))continue;
       if(walkerCollides(build,px,y-.08,pz))return {x:px,y,z:pz,vy:0,grounded:true};
     }
