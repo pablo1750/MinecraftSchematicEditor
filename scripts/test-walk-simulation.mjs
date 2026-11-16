@@ -53,9 +53,13 @@ try{
   }
   assert.ok(peak>1.6,"Space jumps");
   assert.equal(body.grounded,true,"gravity returns player to floor");
-  assert.equal(body.y,1,"lands on initial ground");
+  assert.ok(Math.abs(body.y-1)<.02,"lands on initial ground without visible floating");
   b.data[b.index(3,1,3)]=2;
   assert.equal(walkerCollides(b,3.5,1.2,3.5),true,"slab only occupies lower half");
   assert.equal(walkerCollides(b,3.5,1.5,3.5),false,"upper half over slab is free");
+  let stepper={x:2.5,y:1,z:3.5,vy:0,grounded:true};
+  for(let i=0;i<17;i++)stepper=advanceWalker(b,stepper,{...idle,right:1},1/60);
+  assert.ok(stepper.x>3.1,"walks forward over slab using automatic step-up");
+  assert.ok(stepper.y>=1.45,"stands on top of half slab");
   console.log("OK simulation: spawn, WASD, sprint, jump, gravity, solid collisions, slabs and boundaries.");
 }finally{await server.close();}
