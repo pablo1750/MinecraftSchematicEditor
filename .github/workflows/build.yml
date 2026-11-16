@@ -76,6 +76,9 @@ jobs:
       - name: Test all building light sources
         run: node scripts/test-emissive-lights.mjs
 
+      - name: Test static water rendering
+        run: node scripts/test-water-render.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
