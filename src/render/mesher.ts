@@ -10,6 +10,7 @@
  */
 
 import type { Build } from "../core/model";
+import { paneConnectionMask } from "../core/connect";
 import { DIR_VECTORS, type BakedPalette, type BakedQuad } from "./bake";
 
 export interface MeshData {
@@ -205,7 +206,17 @@ export function meshRegion(
           }
         };
 
-        if (block.single) {
+        if (block.paneParts) {
+          // Read neighbours of this cell, even for imported states that omit
+          // connection properties. The build/palette remain untouched.
+          const mask = paneConnectionMask(build.palette[value], (dx, dz) =>
+            build.palette[at(x + dx, y, z + dz)] ?? build.palette[0],
+          );
+          emit(block.paneParts[0]); // isolated vertical centre
+          for (let arm = 0; arm < 4; arm++) {
+            if (mask & (1 << arm)) emit(block.paneParts[arm + 1]);
+          }
+        } else if (block.single) {
           emit(block.single);
         } else {
           const hash = positionHash(x, y, z);
