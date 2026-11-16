@@ -65,7 +65,7 @@ export default function App() {
   // La construcción recién creada no tiene fileName; recordar su instancia
   // evita que un segundo Guardar genere una duplicación en el catálogo.
   const savedBuildRef = useRef<typeof build>(null);
-  const [propertiesVisible, setPropertiesVisible] = useState(true);
+  const [propertiesVisible, setPropertiesVisible] = useState(false);
   const sourceIsCurrent = serverSource !== null && build !== null &&
     ((serverLoadedFile !== null && fileName === serverLoadedFile) || savedBuildRef.current === build);
   const [dragging, setDragging] = useState(false);
@@ -74,6 +74,16 @@ export default function App() {
   // and Alt say which.
   const [dropImports, setDropImports] = useState(false);
   const [dropTab, setDropTab] = useState(false);
+
+  // Disable the browser context menu across the entire editor, including
+  // outside the canvas when a right-button camera gesture ends.
+  // Application-owned context menus (e.g. hotbar material picker) still work:
+  // preventing the native menu does not stop event propagation.
+  useEffect(() => {
+    const preventBrowserContextMenu = (event: MouseEvent) => event.preventDefault();
+    window.addEventListener("contextmenu", preventBrowserContextMenu, { capture: true });
+    return () => window.removeEventListener("contextmenu", preventBrowserContextMenu, { capture: true });
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
