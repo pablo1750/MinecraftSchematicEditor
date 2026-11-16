@@ -123,6 +123,24 @@ function connects(kind: Kind, selfId: string, neighbour: BlockState, side: Side)
   return !refuses(id) && isSolid(neighbour);
 }
 
+/**
+ * View-only pane connections, evaluated against the actual neighbours.
+ * Bit order: north (1), east (2), south (4), west (8).
+ * Never writes inferred properties back into an imported schematic.
+ */
+export function paneConnectionMask(
+  state: BlockState,
+  neighbour: (dx: number, dz: number) => BlockState,
+): number {
+  const id = baseName(state.name);
+  if (kindOf(id) !== "pane") return 0;
+  let mask = 0;
+  SIDES.forEach((side, index) => {
+    if (connects("pane", id, neighbour(side.dx, side.dz), side)) mask |= 1 << index;
+  });
+  return mask;
+}
+
 /** Reads a cell of the build with the pending writes laid over it. */
 type Reader = (x: number, y: number, z: number) => BlockState;
 
