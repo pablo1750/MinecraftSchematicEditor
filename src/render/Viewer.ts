@@ -7,7 +7,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import type { Build } from "../core/model";
+import { type Build } from "../core/model";
+import { toggleDoorAt } from "./doorInteraction";
 import type { BrushShape } from "../core/brush";
 import { mirrorImages, planePosition, type MirrorConfig } from "../core/mirror";
 import { meshRegion, type MeshData } from "./mesher";
@@ -94,8 +95,10 @@ function blockMaterial(
   kind: 0 | 1 | 2,
   enabler: THREE.Texture,
   textureUniform: { value: THREE.Texture | null },
-): THREE.MeshBasicMaterial {
-  const material = new THREE.MeshBasicMaterial({
+  lit = false,
+): THREE.MeshBasicMaterial | THREE.MeshLambertMaterial {
+  const ctor = lit ? THREE.MeshLambertMaterial : THREE.MeshBasicMaterial;
+  const material = new ctor({
     vertexColors: true,
     map: enabler,
     transparent: kind === 2,
@@ -118,7 +121,7 @@ function blockMaterial(
         "diffuseColor *= texture( blockTextures, vec3( vMapUv, vLayer ) );",
       );
   };
-  material.customProgramCacheKey = () => `block-array-${kind}`;
+  material.customProgramCacheKey = () => `block-array-${kind}-${lit ? "lit" : "flat"}`;
   return material;
 }
 
@@ -176,7 +179,16 @@ export class Viewer {
   private grid: THREE.Object3D | null = null;
 
   private textureUniform: { value: THREE.Texture | null } = { value: null };
-  private materials: THREE.MeshBasicMaterial[];
+  private materials: (THREE.MeshBasicMaterial | THREE.MeshLambertMaterial)[];
+  private litMaterials: (THREE.MeshBasicMaterial | THREE.MeshLambertMaterial)[];
+  private sun = new THREE.DirectionalLight(0xfff0d6, 1);
+  private sky = new THREE.HemisphereLight(0xe5f2ff, 0x404653, 0.82);
+  private fill = new THREE.PointLight(0xffe9cf, 0.25, 9);
+  private simulationOriginalBuild: Build | null = null;
+  private simulationOriginalBaked: BakedPalette | null = null;
+  private simulationFog: THREE.Fog | THREE.FogExp2 | null = null;
+  private doorBusy = false;
+  onSimulationPrepare: (build: Build) => Promise<BakedPalette | null> = async () => null;
   private hoverBox: THREE.LineSegments;
   private selectionBox: THREE.Mesh;
   private selectionEdges: THREE.LineSegments;
@@ -295,6 +307,26 @@ export class Viewer {
       blockMaterial(1, enabler, this.textureUniform),
       blockMaterial(2, enabler, this.textureUniform),
     ];
+    this.litMaterials = [
+      blockMaterial(0, enabler, this.textureUniform, true),
+      blockMaterial(1, enabler, this.textureUniform, true),
+      blockMaterial(2, enabler, this.textureUniform, true),
+    ];
+    this.sun.visible = false;
+    this.sky.visible = false;
+    this.fill.visible = false;
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(1024,1024);
+    this.sun.shadow.camera.left = -28;
+    this.sun.shadow.camera.right = 28;
+    this.sun.shadow.camera.top = 28;
+    this.sun.shadow.camera.bottom = -28;
+    this.sun.shadow.camera.near = 0.5;
+    this.sun.shadow.camera.far = 140;
+    this.sun.shadow.bias = -0.0001;
+    this.sun.shadow.normalBias = 0.02;
+    this.sun.shadow.radius = 2;
+    this.scene.add(this.sun,this.sun.target,this.sky,this.fill);
 
     const unitEdges = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
     this.hoverBox = new THREE.LineSegments(
@@ -412,6 +444,8 @@ export class Viewer {
     this.clearBuild();
     this.disposePushCursor();
     this.controls.dispose();
+    for(const material of [...this.materials,...this.litMaterials])material.dispose();
+    this.sun.shadow.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
     this.labelRenderer.domElement.remove();
@@ -598,7 +632,11 @@ export class Viewer {
     geometry.setIndex(new THREE.BufferAttribute(data.indices, 1));
     geometry.computeBoundingSphere();
 
-    const mesh = existing ?? new THREE.Mesh(geometry, this.materials[layer]);
+    const material = this.simulation ? this.litMaterials[layer] : this.materials[layer];
+    const mesh = existing ?? new THREE.Mesh(geometry, material);
+    mesh.material = material;
+    mesh.castShadow = layer === 0;
+    mesh.receiveShadow = layer !== 2;
     if (existing) {
       existing.geometry.dispose();
       existing.geometry = geometry;
@@ -1373,6 +1411,10 @@ export class Viewer {
 
   private onPointerDown = (event: PointerEvent) => {
     if (this.simulation) {
+      if (event.button === 2) {
+        event.preventDefault();
+        void this.interactWithDoor();
+      }
       if (event.button === 0 && document.pointerLockElement !== this.renderer.domElement) {
         void this.renderer.domElement.requestPointerLock();
       }
@@ -1456,6 +1498,11 @@ export class Viewer {
   /** Simulation listeners are completely independent of editor gestures. */
   private onWalkKeyDown = (event: KeyboardEvent) => {
     if (!this.simulation) return;
+    if (event.code === "KeyE") {
+      event.preventDefault();
+      void this.interactWithDoor();
+      return;
+    }
     if (event.code === "Escape") {
       event.preventDefault();
       this.onSimulationExit();
@@ -1490,6 +1537,21 @@ export class Viewer {
     if (enabled && !this.build) return;
     this.simulation = enabled;
     if (enabled) {
+      // All simulation changes are confined to a clone. The editor's Build
+      // and its style changes survive the entire walk session untouched.
+      this.simulationOriginalBuild = this.build;
+      this.simulationOriginalBaked = this.baked;
+      this.build = this.build!.clone();
+      this.simulationFog = this.scene.fog as THREE.Fog | THREE.FogExp2 | null;
+      this.renderer.setClearColor(0xa4b9ca,1);
+      this.scene.fog = new THREE.Fog(0xa4b9ca,55,125);
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      this.sun.visible = true;
+      this.sky.visible = true;
+      this.fill.visible = true;
+      this.updateSimulationLighting();
+      this.refreshChunkMaterials();
       this.editorPose = {
         position: this.camera.position.clone(),
         quaternion: this.camera.quaternion.clone(),
@@ -1530,6 +1592,18 @@ export class Viewer {
         document.exitPointerLock();
       this.walkKeys.clear();
       this.walkBody = null;
+      this.renderer.shadowMap.enabled = false;
+      this.sun.visible = false;
+      this.sky.visible = false;
+      this.fill.visible = false;
+      this.renderer.setClearColor(0x0d1117,1);
+      this.scene.fog = this.simulationFog;
+      this.simulationFog = null;
+      if (this.simulationOriginalBuild) this.build = this.simulationOriginalBuild;
+      this.simulationOriginalBuild = null;
+      if (this.simulationOriginalBaked) this.setBaked(this.simulationOriginalBaked);
+      this.simulationOriginalBaked = null;
+      this.refreshChunkMaterials();
       this.frameGroup.visible = true;
       this.overlayGroup.visible = true;
       this.guideGroup.visible = true;
@@ -1564,6 +1638,52 @@ export class Viewer {
     },dt);
     this.walkBody=next;
     this.camera.position.set(next.x,next.y+WALK_EYE_HEIGHT,next.z);
+    this.updateSimulationLighting();
+  }
+
+  private refreshChunkMaterials(){
+    for(const chunk of this.chunks)for(let i=0;i<chunk.meshes.length;i++){
+      const mesh=chunk.meshes[i];
+      if(!mesh)continue;
+      mesh.material=this.simulation ? this.litMaterials[i] : this.materials[i];
+      mesh.castShadow=this.simulation && i===0;
+      mesh.receiveShadow=this.simulation && i!==2;
+    }
+  }
+
+  private updateSimulationLighting(){
+    if(!this.simulation || !this.walkBody)return;
+    const p=this.walkBody;
+    this.sun.position.set(p.x+24,p.y+45,p.z+17);
+    this.sun.target.position.set(p.x,p.y,p.z);
+    this.sun.target.updateMatrixWorld();
+    this.fill.position.copy(this.camera.position);
+  }
+
+  /** E or right click: raycast from the crosshair, never through a wall. */
+  private async interactWithDoor(){
+    if(!this.simulation || this.doorBusy || !this.build)return;
+    const build=this.build;
+    this.raycaster.setFromCamera(new THREE.Vector2(0,0),this.camera);
+    this.raycaster.near=0;
+    this.raycaster.far=4.5;
+    const meshes:THREE.Mesh[]=[];
+    for(const chunk of this.chunks)for(const mesh of chunk.meshes)if(mesh)meshes.push(mesh);
+    const hit=this.raycaster.intersectObjects(meshes,false)[0];
+    if(!hit || hit.faceIndex==null)return;
+    const quadBlocks=hit.object.userData.quadBlocks as Uint32Array|undefined;
+    const index=quadBlocks?.[hit.faceIndex>>1];
+    if(index===undefined)return;
+    const [x,y,z]=build.positionOf(index);
+    const changed=toggleDoorAt(build,x,y,z);
+    if(!changed.length)return;
+    this.doorBusy=true;
+    try{
+      const baked=await this.onSimulationPrepare(build);
+      if(!this.simulation || this.build!==build)return;
+      if(baked)this.setBaked(baked);
+      else this.invalidateBlocks(changed);
+    }finally{this.doorBusy=false;}
   }
 
   private attachInput() {
