@@ -15,7 +15,7 @@ const SAVE_FORMATS: { id: SaveFormat; label: string }[] = [
   { id: "nbt", label: "Structure" },
 ];
 
-export function TopBar({ propertiesVisible, onToggleProperties, onSave }: { propertiesVisible: boolean; onToggleProperties: () => void; onSave: () => void }) {
+export function TopBar({ propertiesVisible, onToggleProperties, onSave, onStyles, stylesEnabled }: { propertiesVisible: boolean; onToggleProperties: () => void; onSave: () => void; onStyles: () => void; stylesEnabled: boolean }) {
   const locale = useLocale();
   const build = useStore((s) => s.build);
   const fileName = useStore((s) => s.fileName);
@@ -100,6 +100,11 @@ export function TopBar({ propertiesVisible, onToggleProperties, onSave }: { prop
           <IconSave /> Guardar
         </button>
       )}
+      {build && <button className="btn btn-outline" type="button"
+        onClick={onStyles} disabled={!stylesEnabled}
+        title={stylesEnabled ? "Editar estilos de materiales" : "Guardá primero la construcción en el catálogo"}>
+          Estilos
+        </button>}
       {build && (
         <button className="btn btn-outline" type="button" onClick={onToggleProperties}
           aria-pressed={propertiesVisible} aria-controls="server-properties-panel"
