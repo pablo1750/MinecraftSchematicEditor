@@ -1,4 +1,5 @@
 import type { Build } from "../core/model";
+import type { StyleCell } from "../core/styleLayers";
 import { saveBuild } from "../formats";
 
 export interface ConstruccionServidor {
@@ -113,7 +114,7 @@ export interface EstiloEditor {
   id: string;
   nombre: string;
   reemplazos: Record<string,string>;
-  modificaciones?: unknown[];
+  modificaciones?: StyleCell[];
 }
 export interface EstilosRespuesta {
   estilos_editor: EstiloEditor[];
@@ -132,7 +133,7 @@ export async function consultarEstilos(source: ConstruccionServidor):Promise<Est
 }
 export async function guardarEstilo(
   source:ConstruccionServidor,
-  style:Pick<EstiloEditor,"nombre"|"reemplazos"> & {id?:string;sobrescribir_importado?:boolean},
+  style:Pick<EstiloEditor,"nombre"|"reemplazos"> & {id?:string;modificaciones?:StyleCell[];sobrescribir_importado?:boolean},
 ):Promise<EstiloEditor> {
   const res=await fetch("/api/construcciones?accion=editor_estilo_guardar",{
     method:"POST",credentials:"same-origin",
