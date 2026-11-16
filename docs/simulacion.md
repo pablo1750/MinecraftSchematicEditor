@@ -11,6 +11,7 @@ El editor dispone de un modo **Simular** independiente de los controles de edici
    - **W / A / S / D**: avanzar, desplazarse a los lados y retroceder. Las flechas también funcionan.
    - **Espacio**: saltar.
    - **Shift**: correr.
+   - **E** o **clic derecho**: abrir/cerrar la puerta o puerta de valla apuntada (a un máximo de 4,5 bloques).
    - **Esc**: salir y recuperar el editor.
 4. Al salir se restaura la cámara previa y el nivel de capa, además de todos los controles.
 
@@ -22,6 +23,31 @@ El editor dispone de un modo **Simular** independiente de los controles de edici
 - `src/App.tsx` y `src/styles.css`: ocultan interfaz sin desmontar el viewport ni los documentos.
 
 El simulador **no escribe bloques**, no cambia dimensiones ni guarda el esquema. Reutiliza las texturas y los modelos ya renderizados, sin agregar archivos de recursos ni dependencias.
+
+## Iluminación mejorada
+
+Al entrar en simulación, el renderer utiliza materiales Lambert con luz ambiental
+hemisférica y luz solar direccional, y activa un mapa de sombras suavizadas de
+1024×1024 cerca del personaje. También incorpora una luz de relleno tenue
+junto a la cámara y un color de niebla diurna. Estas opciones solo funcionan
+durante la simulación; al regresar al editor se restauran sus materiales, luz
+y cámara originales, evitando el coste permanente de las sombras.
+
+**Importante:** es una aproximación visual eficiente, no una réplica del
+motor de iluminación en vóxeles de Minecraft. Todavía no calcula propagación
+de luz entre habitaciones ni múltiples luces locales de cada antorcha.
+
+## Puertas interactivas
+
+La interacción mediante `E` o clic derecho lanza un rayo desde el centro de
+la cámara: solo funciona sobre la puerta directamente visible y cercana.
+Abrir una puerta actualiza sus dos mitades; los portones se abren como un
+bloque individual. Se genera temporalmente el modelo de su nuevo estado
+mediante el mismo paquete de texturas activo.
+
+Los cambios se realizan sobre un `Build.clone()` de la simulación: **no se
+guardan ni modifican el original o el estilo**. Al salir se recupera la
+geometría original, la textura anterior y el alcance de selección del editor.
 
 ## Limitaciones iniciales
 
