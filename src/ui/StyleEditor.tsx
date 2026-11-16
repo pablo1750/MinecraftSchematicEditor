@@ -36,7 +36,7 @@ export function StyleEditor({source,build,onClose}:Props) {
   const [selected,setSelected]=useState<Selection>(ORIGINAL);
   const [name,setName]=useState("Original");
   const [map,setMap]=useState<Record<string,string>>({});
-  const [baseline,setBaseline]=useState("");
+  const [baseline,setBaseline]=useState(JSON.stringify({name:"Original",map:{}}));
   const [filter,setFilter]=useState("");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
