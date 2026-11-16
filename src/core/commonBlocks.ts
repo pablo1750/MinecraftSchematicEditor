@@ -158,6 +158,10 @@ export const BLOCK_GROUPS: BlockGroup[] = [
     ],
   },
   {
+    name: "Liquids",
+    blocks: ["minecraft:water", "minecraft:lava"],
+  },
+  {
     name: "Nature",
     blocks: [
       ...tree("leaves"), ...tree("sapling"),
