@@ -109,8 +109,23 @@ export function advanceWalker(build:Build,body:Walker,keys:WalkInput,dt:number):
   for(let i=0;i<steps;i++){
     for(const [axis,movement] of [["x",dx/steps],["z",dz/steps]] as const){
       if(!movement)continue;
-      if(!walkerCollides(build,next.x+(axis==="x"?movement:0),next.y,
-        next.z+(axis==="z"?movement:0)))next[axis]+=movement;
+      const nextX=next.x+(axis==="x"?movement:0);
+      const nextZ=next.z+(axis==="z"?movement:0);
+      if(!walkerCollides(build,nextX,next.y,nextZ)) {
+        next[axis]+=movement;
+      } else if (next.grounded) {
+        // Minecraft-like auto-step over slabs and the lower half of stairs.
+        // A full block is taller than 0.6 and remains impassable.
+        for(let lift=.1;lift<=.61;lift+=.1){
+          if(walkerCollides(build,next.x,next.y+lift,next.z) ||
+             walkerCollides(build,nextX,next.y+lift,nextZ))continue;
+          next.y+=lift;
+          next[axis]+=movement;
+          next.vy=0;
+          next.grounded=false;
+          break;
+        }
+      }
     }
     const y=next.y+dy/steps;
     if(walkerCollides(build,next.x,y,next.z)){
