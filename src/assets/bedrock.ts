@@ -198,7 +198,9 @@ export function doorElements(
   const bounds=open ? opened[facing][right?1:0] : closed[facing];
   const [x0,y0,z0,x1,y1,z1]=bounds;
   const alongX=(x1-x0)> (z1-z0);
-  const wide={texture,uv:[0,0,16,16] as [number,number,number,number]};
+  // Mirrored door leaves need mirrored front/back UVs so the handles meet
+  // at the seam of double doors rather than pointing to the same side.
+  const wide={texture,uv:(right ? [16,0,0,16] : [0,0,16,16]) as [number,number,number,number]};
   const edge={texture,uv:[0,0,3,16] as [number,number,number,number]};
   const cap={texture,uv:[0,0,16,3] as [number,number,number,number]};
   return [{
