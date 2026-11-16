@@ -141,6 +141,27 @@ export function paneConnectionMask(
   return mask;
 }
 
+/**
+ * View-only fence connections inferred from actual neighbours.
+ * Uses the same game rules as repairConnections (including fence gates and
+ * the distinction between wooden and nether-brick fences) but never edits
+ * the imported schematic. Bits: N=1, E=2, S=4, W=8.
+ */
+export function fenceConnectionMask(
+  state: BlockState,
+  neighbour: (dx: number, dz: number) => BlockState,
+): number {
+  const id = baseName(state.name);
+  if (kindOf(id) !== "fence") return 0;
+  let mask = 0;
+  SIDES.forEach((side, index) => {
+    if (connects("fence", id, neighbour(side.dx, side.dz), side)) {
+      mask |= 1 << index;
+    }
+  });
+  return mask;
+}
+
 /** Reads a cell of the build with the pending writes laid over it. */
 type Reader = (x: number, y: number, z: number) => BlockState;
 
