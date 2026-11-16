@@ -104,6 +104,7 @@ export function advanceWalker(build:Build,body:Walker,keys:WalkInput,dt:number):
   next.vy=Math.max(-35,next.vy-WALK_GRAVITY*dt);
   const dy=next.vy*dt;
   const steps=Math.max(1,Math.ceil(Math.max(Math.abs(dx),Math.abs(dz),Math.abs(dy))/.10));
+  if(!Number.isFinite(steps)) console.warn("walk invalid step", {body,keys,dx,dz,dy,steps});
   for(let i=0;i<steps;i++){
     for(const [axis,movement] of [["x",dx/steps],["z",dz/steps]] as const){
       if(!movement)continue;
