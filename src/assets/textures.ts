@@ -131,7 +131,7 @@ export class TextureArrayBuilder {
 
   /** Returns the layer for a texture path, reserving one if it is new. */
   layerFor(path: string | null): number {
-    if (!path || !this.pack?.textures.has(path)) return GRAIN_LAYER;
+    if (!path || (!this.synthetic.has(path) && !this.pack?.textures.has(path))) return GRAIN_LAYER;
     const existing = this.index.get(path);
     if (existing !== undefined) return existing;
     const layer = this.order.length + 1;
