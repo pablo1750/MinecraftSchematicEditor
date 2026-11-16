@@ -198,17 +198,19 @@ export function doorElements(
   const bounds=open ? opened[facing][right?1:0] : closed[facing];
   const [x0,y0,z0,x1,y1,z1]=bounds;
   const alongX=(x1-x0)> (z1-z0);
-  // Mirrored door leaves need mirrored front/back UVs so the handles meet
-  // at the seam of double doors rather than pointing to the same side.
-  const wide={texture,uv:(right ? [16,0,0,16] : [0,0,16,16]) as [number,number,number,number]};
+  // North and south (likewise east/west) have opposite local UV axes.
+  // Both sides must show the handle at the same *world-space* hinge edge.
+  // Mirroring only by hinge fixes one face but reverses the other.
+  const wideFront={texture,uv:(right ? [16,0,0,16] : [0,0,16,16]) as [number,number,number,number]};
+  const wideBack={texture,uv:(right ? [0,0,16,16] : [16,0,0,16]) as [number,number,number,number]};
   const edge={texture,uv:[0,0,3,16] as [number,number,number,number]};
   const cap={texture,uv:[0,0,16,3] as [number,number,number,number]};
   return [{
     from:[x0,y0,z0],to:[x1,y1,z1],
     shade:false,
     faces:{
-      north:alongX?wide:edge,south:alongX?wide:edge,
-      east:alongX?edge:wide,west:alongX?edge:wide,
+      north:alongX?wideFront:edge,south:alongX?wideBack:edge,
+      east:alongX?edge:wideFront,west:alongX?edge:wideBack,
       up:cap,down:cap,
     },
   }];
