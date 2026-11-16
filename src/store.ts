@@ -1677,63 +1677,6 @@ export const useStore = create<State & Actions>((set, get) => {
       }
     },
 
-    /* Previous Java auto-discovery retained for future multi-edition support.
-    autoLoadResourcePackLegacy: async () => {
-      if (autoLoadStarted || pack) return;
-      autoLoadStarted = true;
-
-      // What the dev server can see is offered whatever else happens, so the
-      // menu has something to show even when nothing loads automatically.
-      const probeLocal = () => {
-        void findInstalledVersions().then((versions) => set({ installedVersions: versions }));
-        void findInstances().then((instances) => set({ installedInstances: instances }));
-      };
-
-      if (isAutoLoadDisabled()) {
-        // Unloaded on purpose last time; still offer whatever is installed.
-        probeLocal();
-        return;
-      }
-
-      // Mod jars are restored before the base pack so the first bake already
-      // has them, rather than baking twice and flashing untextured blocks.
-      for (const mod of await readCachedMods()) {
-        if (!(await adoptMod(mod.name, new Uint8Array(mod.bytes), false))) {
-          await deleteCachedMod(mod.name);
-        }
-      }
-
-      const cached = await readCachedPack();
-      if (cached) {
-        set({ packStatus: "loading" });
-        // A cached pack that no longer parses is worse than none; drop it.
-        if (await adoptPack(cached.name, new Uint8Array(cached.bytes), "cache", false)) {
-          probeLocal();
-          return;
-        }
-        await clearCachedPack();
-      }
-
-      void findInstances().then((instances) => set({ installedInstances: instances }));
-      const versions = await findInstalledVersions();
-      set({ installedVersions: versions });
-      if (versions.length === 0) {
-        set({ packStatus: "none" });
-        return;
-      }
-
-      set({ packStatus: "loading", packError: null });
-      try {
-        const [newest] = versions;
-        const bytes = await fetchInstalledVersion(newest.id);
-        await adoptPack(`${newest.id}.jar`, bytes, "auto", true);
-      } catch {
-        // The install vanished or is unreadable; the picker still works.
-        set({ packStatus: "none" });
-      }
-    },
-
-    */
     clearResourcePack: async () => {
       // The mods go with it. They only ever made sense stacked on a base pack —
       // a mod jar alone has no dirt, no stone and no cube_all to parent to.
