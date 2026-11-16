@@ -566,6 +566,9 @@ export async function bakePalette(build: Build, pack: ResourcePack | null): Prom
       const path=WATER_TEXTURE_KEY;
       textures.generatedLayer(path,makeWaterTexture());
       const model=boxModel(path,[[0,0,0,1,waterHeight(state),1]]);
+      // The water surface is hidden when the cell above also contains water.
+      // boxModel only adds top culling for full-height boxes.
+      if(model.elements[0].faces.up)model.elements[0].faces.up.cullface="up";
       const quads:BakedQuad[]=[];
       const placement:Placement={model,x:0,y:0,uvlock:false};
       for(const element of model.elements){
