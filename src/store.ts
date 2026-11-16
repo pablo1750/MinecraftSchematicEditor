@@ -1611,6 +1611,16 @@ export const useStore = create<State & Actions>((set, get) => {
       viewer = next;
       if (!next) { set({simulation:false}); return; }
       next.onSimulationExit = () => get().exitSimulation();
+      // Simulation bakes door states on its disposable Build, not on the
+      // original document, so temporary openings never become edits.
+      next.onSimulationPrepare = async (simulationBuild) => {
+        if (!get().simulation || viewer !== next) return null;
+        if (get().texturesEnabled && isBedrockPack(basePack)) {
+          await prepareBedrockPalette(basePack!, simulationBuild.palette);
+          relayerPacks();
+        }
+        return bakePalette(simulationBuild, get().texturesEnabled ? pack : null);
+      };
       next.setEditing(get().tool !== "move");
       syncClip();
       syncTool();
