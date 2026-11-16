@@ -153,6 +153,8 @@ interface State {
   styleEditing: boolean;
   styleWritable: boolean;
   simulation: boolean;
+  photoMode: boolean;
+  photoSettings: import("./render/Viewer").PhotoSettings;
   /** Transient one-line message: what a canvas edit did, or why it couldn't. */
   notice: string | null;
 
@@ -332,6 +334,9 @@ interface Actions {
   attachViewer: (viewer: Viewer | null) => void;
   takePhoto: () => string | null;
   enterSimulation: () => void;
+  enterPhotoMode: () => void;
+  updatePhotoSettings: (settings: import("./render/Viewer").PhotoSettings) => void;
+  takePhotoPng: () => string | null;
   exitSimulation: () => void;
   /** Routes a dropped file to the schematic loader or the pack loader. */
   openAny: (file: File) => Promise<void>;
@@ -1526,6 +1531,8 @@ export const useStore = create<State & Actions>((set, get) => {
     styleEditing: false,
     styleWritable: false,
     simulation: false,
+    photoMode: false,
+    photoSettings: {hour:20,sunlight:1,ambient:1,lamps:1.5,fog:0,fov:65,speed:12},
     notice: null,
 
     tool: "move",
@@ -1597,19 +1604,30 @@ export const useStore = create<State & Actions>((set, get) => {
     redoStack: [],
 
     takePhoto: () => viewer?.takePhoto() ?? null,
+    takePhotoPng: () => viewer?.takePhotoPng() ?? null,
+    updatePhotoSettings: (settings) => {
+      set({photoSettings:settings});
+      viewer?.setPhotoSettings(settings);
+    },
+    enterPhotoMode: () => {
+      if(!get().build || !viewer || get().simulation)return;
+      viewer.setSimulation(true,true);
+      viewer.setPhotoSettings(get().photoSettings);
+      set({simulation:true,photoMode:true,hover:null});
+    },
     enterSimulation: () => {
       if (!get().build || !viewer || get().simulation) return;
       viewer.setSimulation(true);
-      set({simulation:true,hover:null});
+      set({simulation:true,photoMode:false,hover:null});
     },
     exitSimulation: () => {
       if (!get().simulation) return;
       viewer?.setSimulation(false);
-      set({simulation:false});
+      set({simulation:false,photoMode:false});
     },
     attachViewer: (next) => {
       viewer = next;
-      if (!next) { set({simulation:false}); return; }
+      if (!next) { set({simulation:false,photoMode:false}); return; }
       next.onSimulationExit = () => get().exitSimulation();
       // Simulation bakes door states on its disposable Build, not on the
       // original document, so temporary openings never become edits.
