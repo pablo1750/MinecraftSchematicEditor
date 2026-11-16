@@ -45,6 +45,7 @@ import {
   readCachedPack, setAutoLoadDisabled, writeCachedMod, writeCachedPack,
 } from "./assets/cache";
 import { modLabel } from "./core/blockCatalog";
+import { loadBedrockPack, prepareBedrockPalette, isBedrockPack } from "./assets/bedrock";
 import { bakePalette } from "./render/bake";
 import type { BlockHit, ThroughSelection, Viewer } from "./render/Viewer";
 
@@ -283,7 +284,7 @@ interface State {
   packError: string | null;
   packCounts: { blockstates: number; models: number; textures: number } | null;
   /** Where the current pack came from, for the chip's tooltip. */
-  packSource: "auto" | "manual" | "cache" | null;
+  packSource: "auto" | "manual" | "cache" | "bedrock" | null;
   /**
    * Every block the loaded pack knows about, as bare ids. A pack carries one
    * blockstate file per block, which is the only complete and version-accurate
@@ -348,6 +349,7 @@ interface Actions {
   loadResourcePack: (file: File) => Promise<void>;
   /** Restores the cached pack, or picks up a local install if there is none. */
   autoLoadResourcePack: () => Promise<void>;
+  useBedrockTextures: () => Promise<void>;
   useInstalledVersion: (id: string) => Promise<void>;
   clearResourcePack: () => Promise<void>;
   setTexturesEnabled: (enabled: boolean) => Promise<void>;
@@ -883,7 +885,9 @@ export const useStore = create<State & Actions>((set, get) => {
     set({ baking: true });
     try {
       const source = get().texturesEnabled ? pack : null;
+      if (source && isBedrockPack(basePack)) await prepareBedrockPalette(basePack!, build.palette);
       const baked = await bakePalette(build, source);
+      if (source && isBedrockPack(basePack)) relayerPacks();
       // A newer bake started while this one was decoding textures.
       if (token !== bakeToken) return;
       bakedCount = build.palette.length;
@@ -1654,6 +1658,29 @@ export const useStore = create<State & Actions>((set, get) => {
     autoLoadResourcePack: async () => {
       if (autoLoadStarted || pack) return;
       autoLoadStarted = true;
+      await get().useBedrockTextures();
+      return;
+    },
+
+    useBedrockTextures: async () => {
+      if (isBedrockPack(basePack)) return;
+      set({ packStatus: "loading", packError: null });
+      try {
+        const loaded = await loadBedrockPack();
+        basePack = loaded;
+        modPacks = [];
+        set({ packStatus: "ready", packName: "Bedrock", packSource: "bedrock", texturesEnabled: true });
+        relayerPacks();
+        await rebake();
+      } catch (cause) {
+        set({ packStatus: "error", packError: cause instanceof Error ? cause.message : String(cause) });
+      }
+    },
+
+    /* Previous Java auto-discovery retained for future multi-edition support.
+    autoLoadResourcePackLegacy: async () => {
+      if (autoLoadStarted || pack) return;
+      autoLoadStarted = true;
 
       // What the dev server can see is offered whatever else happens, so the
       // menu has something to show even when nothing loads automatically.
@@ -1706,6 +1733,7 @@ export const useStore = create<State & Actions>((set, get) => {
       }
     },
 
+    */
     clearResourcePack: async () => {
       // The mods go with it. They only ever made sense stacked on a base pack —
       // a mod jar alone has no dirt, no stone and no cube_all to parent to.
