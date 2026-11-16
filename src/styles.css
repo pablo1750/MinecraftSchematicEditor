@@ -1870,3 +1870,26 @@ kbd {
 .style-editor-choose span { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .style-editor-choose .swatch { flex-shrink:0; }
 .style-editor-clear { flex-shrink:0; padding:6px 9px; }
+
+/* -------------------------------------------------- Minecraft walk simulation */
+/* The existing editor remains mounted: only the WebGL canvas occupies the screen. */
+.app[data-simulation="true"] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "stage";
+}
+.app[data-simulation="true"] > :not(.stage) { display: none !important; }
+.app[data-simulation="true"] .stage { grid-area: stage; }
+.app[data-simulation="true"] .stage > :not(.viewer) { display: none !important; }
+.app[data-simulation="true"] .stage::after {
+  content: "+";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font: 24px/1 var(--mono);
+  pointer-events: none;
+  text-shadow: 0 1px 2px #000;
+}
+.app[data-simulation="true"] .viewer { cursor: crosshair; }
