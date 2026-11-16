@@ -1517,7 +1517,9 @@ export class Viewer {
       window.addEventListener("blur",this.onWalkBlur);
       document.addEventListener("mousemove",this.onWalkMouseMove);
       document.addEventListener("pointerlockchange",this.onWalkUnlock);
-      // Clicking the canvas asks for pointer lock under user activation.
+      // The Simular button is a user gesture, so capture the mouse immediately.
+      // If a browser denies this, clicking the canvas retries safely.
+      void this.renderer.domElement.requestPointerLock().catch(() => {});
     } else {
       window.removeEventListener("keydown",this.onWalkKeyDown);
       window.removeEventListener("keyup",this.onWalkKeyUp);
