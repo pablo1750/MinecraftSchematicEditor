@@ -61,7 +61,7 @@ export function ServerProperties({ ref, onRequireDetails, source, mode, onSaved,
   }
 
   async function save() {
-    if (!build || saving) return;
+    if (!build || saving || useStore.getState().styleEditing) return;
     setError("");
     setMessage("");
     if (!nombre.trim() || !categoria.trim()) {
