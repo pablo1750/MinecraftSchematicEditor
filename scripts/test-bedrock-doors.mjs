@@ -47,6 +47,11 @@ try {
       "left hinge uses original handle side");
     assert.deepEqual(right.faces[broadFace].uv,[16,0,0,16],
       "right hinge mirrors handle to face the other door");
+    const backFace=facing==="north" || facing==="south" ? "south" : "west";
+    assert.deepEqual(left.faces[backFace].uv,[16,0,0,16],
+      "left hinge handles keep the same world-space edge from behind");
+    assert.deepEqual(right.faces[backFace].uv,[0,0,16,16],
+      "right hinge handles keep the same world-space edge from behind");
   }
   for (const facing of Object.keys(closed)) {
     const lower=doorElements(texture,{facing,open:"true",hinge:"right",half:"lower"});
