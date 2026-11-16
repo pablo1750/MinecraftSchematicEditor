@@ -30,4 +30,4 @@ export function makeWaterTexture():DecodedTexture {
   return {size,rgba,opaque:false};
 }
 
-export const WATER_TEXTURE_KEY="<water-procedural>";
+export const WATER_TEXTURE_KEY="minecraft:block/water_procedural";
