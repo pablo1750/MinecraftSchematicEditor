@@ -24,8 +24,7 @@ export function TexturePack() {
       <select
         aria-label="Edición de Minecraft"
         title="Las texturas de Bedrock se cargan automáticamente desde el servidor"
-        value="bedrock"
-        onChange={() => {}}
+        defaultValue="bedrock"
         style={{ background: "transparent", color: "inherit", border: 0, maxWidth: 118 }}
       >
         <option value="bedrock">Bedrock</option>
