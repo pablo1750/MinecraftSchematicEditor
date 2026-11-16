@@ -153,6 +153,9 @@ function ringGeometry(radius: number, segments = 48): THREE.BufferGeometry {
   return new THREE.BufferGeometry().setFromPoints(points);
 }
 
+export interface PhotoSettings {
+  hour:number; sunlight:number; ambient:number; lamps:number; fog:number; fov:number; speed:number;
+}
 export class Viewer {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
@@ -164,6 +167,33 @@ export class Viewer {
   takePhoto(): string {
     this.renderer.render(this.scene, this.camera);
     return this.renderer.domElement.toDataURL("image/webp", 0.88);
+  }
+
+  takePhotoPng(): string {
+    this.renderer.render(this.scene,this.camera);
+    return this.renderer.domElement.toDataURL("image/png");
+  }
+  setPhotoSettings(settings:PhotoSettings) {
+    this.photoSettings = {...settings};
+    if(!this.photoMode)return;
+    this.camera.fov=settings.fov;
+    this.camera.updateProjectionMatrix();
+    this.applyPhotoLighting();
+  }
+  private applyPhotoLighting() {
+    if(!this.photoMode)return;
+    const s=this.photoSettings;
+    const daylight=Math.max(0,Math.sin((s.hour-6)*Math.PI/12));
+    const dusk=Math.max(0,1-Math.abs(s.hour-19)/3);
+    const sky=new THREE.Color().setRGB(
+      .025+daylight*.63+dusk*.16,.035+daylight*.72+dusk*.065,.09+daylight*.75+dusk*.015);
+    this.renderer.setClearColor(sky,1);
+    this.sun.intensity=s.sunlight*daylight;
+    this.sky.intensity=s.ambient*(.3+1.05*daylight);
+    this.ambient.intensity=s.ambient*(.14+.51*daylight);
+    this.fill.intensity=s.ambient*.25;
+    this.buildingLights.forEach((lamp,i)=>{lamp.intensity=this.photoLampIntensities[i]*s.lamps;});
+    this.scene.fog=s.fog>0?new THREE.Fog(sky,25/s.fog,160/s.fog):null;
   }
 
   private renderer: THREE.WebGLRenderer;
@@ -202,6 +232,7 @@ export class Viewer {
   private fill = new THREE.PointLight(0xffe9cf, 0.25, 9);
   /** Every emitter in this finite building gets its own local light. */
   private buildingLights: THREE.PointLight[] = [];
+  private photoLampIntensities: number[] = [];
   private simulationOriginalBuild: Build | null = null;
   private simulationOriginalBaked: BakedPalette | null = null;
   private simulationFog: THREE.Fog | THREE.FogExp2 | null = null;
@@ -274,6 +305,8 @@ export class Viewer {
   private walkBody: Walker | null = null;
   private walkKeys = new Set<string>();
   private walkFlying = false;
+  private photoMode = false;
+  private photoSettings: PhotoSettings = {hour:20,sunlight:1,ambient:1,lamps:1.5,fog:0,fov:65,speed:12};
   private lastSpacePress = -Infinity;
   private suppressSpaceUntilRelease = false;
   private lastFrameTime = 0;
@@ -1523,7 +1556,7 @@ export class Viewer {
   /** Simulation listeners are completely independent of editor gestures. */
   private onWalkKeyDown = (event: KeyboardEvent) => {
     if (!this.simulation) return;
-    if (event.code === "Space" && !event.repeat) {
+    if (event.code === "Space" && !event.repeat && !this.photoMode) {
       event.preventDefault();
       const now = performance.now();
       if (now - this.lastSpacePress <= 300) {
@@ -1547,7 +1580,9 @@ export class Viewer {
     }
     if (event.code === "Escape") {
       event.preventDefault();
-      this.onSimulationExit();
+      if (this.photoMode && document.pointerLockElement === this.renderer.domElement)
+        document.exitPointerLock();
+      else this.onSimulationExit();
       return;
     }
     if (["KeyW","KeyA","KeyS","KeyD","ArrowUp","ArrowDown","ArrowLeft",
@@ -1566,7 +1601,7 @@ export class Viewer {
     rotateCameraInPlace(this.camera, event.movementX, event.movementY);
   };
   private onWalkUnlock = () => {
-    if (this.simulation && document.pointerLockElement !== this.renderer.domElement) {
+    if (this.simulation && !this.photoMode && document.pointerLockElement !== this.renderer.domElement) {
       this.onSimulationExit();
     }
   };
@@ -1580,10 +1615,11 @@ export class Viewer {
    * Walk mode keeps its own camera position, keyboard and pointer lock.
    * Leaving restores the editor camera exactly; no schematic data is touched.
    */
-  setSimulation(enabled: boolean) {
+  setSimulation(enabled: boolean, photo = false) {
     if (enabled === this.simulation) return;
     if (enabled && !this.build) return;
     this.simulation = enabled;
+    this.photoMode = enabled && photo;
     if (enabled) {
       // All simulation changes are confined to a clone. The editor's Build
       // and its style changes survive the entire walk session untouched.
@@ -1594,7 +1630,9 @@ export class Viewer {
       // just those near the character. Point shadows remain off: each would
       // require six shadow passes and quickly overwhelm WebGL.
       this.clearBuildingLights();
-      this.buildingLights = collectBlockLights(this.build).map(source => {
+      const lightSources=collectBlockLights(this.build);
+      this.photoLampIntensities=lightSources.map(source=>source.intensity);
+      this.buildingLights = lightSources.map(source => {
         const light = new THREE.PointLight(source.color, source.intensity, source.radius, 2);
         light.position.set(source.x, source.y, source.z);
         light.castShadow = false;
@@ -1625,6 +1663,15 @@ export class Viewer {
       this.camera.position.set(this.walkBody.x,this.walkBody.y+WALK_EYE_HEIGHT,this.walkBody.z);
       const heading = new THREE.Euler().setFromQuaternion(this.camera.quaternion,"YXZ");
       this.camera.quaternion.setFromEuler(new THREE.Euler(0,heading.y,0,"YXZ"));
+      if(photo){
+        const centre=new THREE.Vector3(build.width/2,build.height/2,build.length/2);
+        const distance=Math.max(build.width,build.height,build.length)*1.45+8;
+        this.camera.position.set(centre.x+distance*.7,centre.y+distance*.42,centre.z+distance*.7);
+        this.camera.lookAt(centre);
+        this.camera.fov=this.photoSettings.fov;
+        this.camera.updateProjectionMatrix();
+        this.applyPhotoLighting();
+      }
       this.setLayerLimit(build.height-1);
       this.frameGroup.visible = false;
       this.overlayGroup.visible = false;
@@ -1644,7 +1691,7 @@ export class Viewer {
       document.addEventListener("pointerlockchange",this.onWalkUnlock);
       // The Simular button is a user gesture, so capture the mouse immediately.
       // If a browser denies this, clicking the canvas retries safely.
-      void this.renderer.domElement.requestPointerLock().catch(() => {});
+      if(!photo) void this.renderer.domElement.requestPointerLock().catch(() => {});
     } else {
       window.removeEventListener("keydown",this.onWalkKeyDown);
       window.removeEventListener("keyup",this.onWalkKeyUp);
@@ -1658,6 +1705,13 @@ export class Viewer {
       this.lastSpacePress = -Infinity;
       this.suppressSpaceUntilRelease = false;
       this.walkBody = null;
+      this.camera.fov=55;
+      this.camera.updateProjectionMatrix();
+      this.sun.intensity=1;
+      this.sky.intensity=1.35;
+      this.ambient.intensity=.65;
+      this.fill.intensity=.25;
+      this.photoLampIntensities=[];
       this.renderer.shadowMap.enabled = false;
       this.sun.visible = false;
       this.sky.visible = false;
@@ -1695,6 +1749,22 @@ export class Viewer {
     const dt=Math.min(.05,Math.max(0,(now-this.lastFrameTime)/1000));
     this.lastFrameTime=now;
     const keys=this.walkKeys;
+    if(this.photoMode){
+      const speed=this.photoSettings.speed*(keys.has("ControlLeft")||keys.has("ControlRight")?3:1);
+      const forward=Number(keys.has("KeyW")||keys.has("ArrowUp"))-Number(keys.has("KeyS")||keys.has("ArrowDown"));
+      const right=Number(keys.has("KeyD")||keys.has("ArrowRight"))-Number(keys.has("KeyA")||keys.has("ArrowLeft"));
+      const vertical=Number(keys.has("Space"))-Number(keys.has("ShiftLeft")||keys.has("ShiftRight"));
+      const yaw=new THREE.Euler().setFromQuaternion(this.camera.quaternion,"YXZ").y;
+      const motion=new THREE.Vector3(right,vertical,-forward);
+      if(motion.lengthSq()>0){
+        motion.normalize().applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
+        this.camera.position.addScaledVector(motion,speed*dt);
+      }
+      this.walkBody={...body,x:this.camera.position.x,y:this.camera.position.y-WALK_EYE_HEIGHT,
+        z:this.camera.position.z,vy:0,grounded:false};
+      this.updateSimulationLighting();
+      return;
+    }
     const yaw=new THREE.Euler().setFromQuaternion(this.camera.quaternion,"YXZ").y;
     const next=advanceWalker(build,body,{
       forward:Number(keys.has("KeyW")||keys.has("ArrowUp"))-
@@ -1734,7 +1804,10 @@ export class Viewer {
   private updateSimulationLighting(){
     if(!this.simulation || !this.walkBody)return;
     const p=this.walkBody;
-    this.sun.position.set(p.x+24,p.y+45,p.z+17);
+    if(this.photoMode){
+      const angle=(this.photoSettings.hour-6)*Math.PI/12;
+      this.sun.position.set(p.x+Math.cos(angle)*45,p.y+Math.sin(angle)*45,p.z+17);
+    }else this.sun.position.set(p.x+24,p.y+45,p.z+17);
     this.sun.target.position.set(p.x,p.y,p.z);
     this.sun.target.updateMatrixWorld();
     this.fill.position.copy(this.camera.position);
