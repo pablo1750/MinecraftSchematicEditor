@@ -251,7 +251,7 @@ export function fenceGateElements(
       [1,6,z0,3,9,z1],
       [1,12,z0,3,15,z1],
       [13,6,z0,15,9,z1],
-      [13,12,z0,15,z1===14?15:15,z1],
+      [13,12,z0,15,15,z1],
     );
   }
   const face=(uv:[number,number,number,number])=>({texture,uv});
