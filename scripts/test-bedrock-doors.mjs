@@ -38,6 +38,16 @@ try {
     }
   }
   for (const facing of Object.keys(closed)) {
+    const left=doorElements(texture,{facing,hinge:"left",open:"false"})[0];
+    const right=doorElements(texture,{facing,hinge:"right",open:"false"})[0];
+    assert.deepEqual([right.from,right.to],[left.from,left.to],
+      "closed halves keep geometry aligned: "+facing);
+    assert.deepEqual(left.faces.north.uv,[0,0,16,16],
+      "left hinge uses original handle side");
+    assert.deepEqual(right.faces.north.uv,[16,0,0,16],
+      "right hinge mirrors handle to face the other door");
+  }
+  for (const facing of Object.keys(closed)) {
     const lower=doorElements(texture,{facing,open:"true",hinge:"right",half:"lower"});
     const upper=doorElements(texture,{facing,open:"true",hinge:"right",half:"upper"});
     assert.deepEqual(lower.map(e=>[e.from,e.to]),upper.map(e=>[e.from,e.to]),
