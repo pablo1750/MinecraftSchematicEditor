@@ -102,6 +102,11 @@ export function TopBar({ propertiesVisible, onToggleProperties, onSave, onStyles
         </button>
       )}
       {build && <button className="btn btn-outline" type="button"
+        onClick={() => useStore.getState().enterSimulation()}
+        title="Caminar por la construcción en primera persona. WASD para moverse; Esc para volver.">
+          Simular
+        </button>}
+      {build && <button className="btn btn-outline" type="button"
         onClick={onStyles} disabled={!stylesEnabled}
         title={stylesEnabled ? "Editar estilos de materiales" : "Guardá primero la construcción en el catálogo"}>
           Estilos
