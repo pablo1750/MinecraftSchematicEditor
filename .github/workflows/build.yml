@@ -79,6 +79,9 @@ jobs:
       - name: Test static water rendering
         run: node scripts/test-water-render.mjs
 
+      - name: Test translated block picker IDs
+        run: node scripts/test-block-picker-search.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
