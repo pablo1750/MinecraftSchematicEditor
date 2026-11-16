@@ -36,13 +36,13 @@ import { STARTER_BLOCKS } from "./core/commonBlocks";
 import { cssColor } from "./core/blockLook";
 import { loadBuild, saveBuild, suggestFilename, type SaveFormat } from "./formats";
 import {
-  blocksInNamespace, fetchInstalledVersion, fetchInstanceMod, findInstalledVersions,
-  findInstances, loadPackBytes, stackPacks,
+  blocksInNamespace, fetchInstalledVersion, fetchInstanceMod,
+  loadPackBytes, stackPacks,
   type InstalledInstance, type InstalledVersion, type ResourcePack,
 } from "./assets/pack";
 import {
-  clearCachedMods, clearCachedPack, deleteCachedMod, isAutoLoadDisabled, readCachedMods,
-  readCachedPack, setAutoLoadDisabled, writeCachedMod, writeCachedPack,
+  clearCachedMods, clearCachedPack, deleteCachedMod,
+  setAutoLoadDisabled, writeCachedMod, writeCachedPack,
 } from "./assets/cache";
 import { modLabel } from "./core/blockCatalog";
 import { loadBedrockPack, prepareBedrockPalette, isBedrockPack } from "./assets/bedrock";
