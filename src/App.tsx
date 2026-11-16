@@ -60,6 +60,7 @@ export default function App() {
   useLocale(); // Rerenderizar paneles y textos al cambiar de idioma.
   const build = useStore((s) => s.build);
   const simulation = useStore((s) => s.simulation);
+  const photoMode = useStore((s) => s.photoMode);
   const fileName = useStore((s) => s.fileName);
   const [serverSource, setServerSource] = useState<ConstruccionServidor | null>(null);
   const [serverLoadedFile, setServerLoadedFile] = useState<string | null>(null);
@@ -255,6 +256,7 @@ export default function App() {
       className="app"
       data-empty={build ? "false" : "true"}
       data-simulation={simulation ? "true" : "false"}
+      data-photo={photoMode ? "true" : "false"}
       onDragOver={(e) => {
         if (simulation || !e.dataTransfer.types.includes("Files")) return;
         e.preventDefault();
@@ -288,6 +290,7 @@ export default function App() {
 
       <main className="stage">
         <Viewport />
+        {photoMode && <PhotoPanel />}
         {stylesVisible && sourceIsCurrent && serverSource && build && serverMode==="editar" &&
           <StyleEditor key={serverSource.categoria+"/"+serverSource.id}
             source={serverSource} build={build}
@@ -526,4 +529,38 @@ function StageHud() {
       </button>
     </div>
   );
+}
+
+function PhotoPanel() {
+  const settings=useStore((s)=>s.photoSettings);
+  const [hidden,setHidden]=useState(false);
+  const change=(key:keyof typeof settings,value:number)=>
+    useStore.getState().updatePhotoSettings({...settings,[key]:value});
+  const capture=()=>{
+    const url=useStore.getState().takePhotoPng();
+    if(!url)return;
+    const link=document.createElement("a");
+    link.href=url;
+    link.download="minecraft-foto-"+new Date().toISOString().replace(/[:.]/g,"-")+".png";
+    link.click();
+  };
+  return <div className="photo-panel">
+    {hidden ? <button className="btn btn-primary" onClick={()=>setHidden(false)}>Mostrar controles</button> : <>
+      <div className="photo-heading"><strong>Modo foto</strong>
+        <button className="btn" onClick={()=>useStore.getState().exitSimulation()}>Salir</button></div>
+      <p>WASD mover · Espacio subir · Shift bajar · Ctrl rápido · Clic para mirar · Esc libera mouse</p>
+      {([
+        ["hour","Hora",0,24,1],["sunlight","Sol",0,3,.1],["ambient","Ambiente",0,3,.1],
+        ["lamps","Luces artificiales",0,4,.1],["fog","Niebla",0,2,.1],
+        ["fov","Campo visual",30,110,1],["speed","Velocidad",2,60,1],
+      ] as const).map(([key,label,min,max,step])=>
+        <label key={key} className="photo-setting"><span>{label} <b>{settings[key]}</b></span>
+          <input type="range" min={min} max={max} step={step} value={settings[key]}
+            onChange={(event)=>change(key,Number(event.target.value))}/></label>)}
+      <div className="photo-actions">
+        <button className="btn btn-primary" onClick={capture}>Capturar PNG</button>
+        <button className="btn" onClick={()=>setHidden(true)}>Ocultar panel</button>
+      </div>
+    </>}
+  </div>;
 }
