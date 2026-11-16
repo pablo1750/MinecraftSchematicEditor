@@ -147,6 +147,8 @@ interface State {
   status: "empty" | "loading" | "ready" | "error";
   error: string | null;
   fileName: string | null;
+  /** Visual-only material substitutions for the selected editor style. */
+  stylePreview: Record<string, string> | null;
   /** Transient one-line message: what a canvas edit did, or why it couldn't. */
   notice: string | null;
 
@@ -353,6 +355,7 @@ interface Actions {
   useInstalledVersion: (id: string) => Promise<void>;
   clearResourcePack: () => Promise<void>;
   setTexturesEnabled: (enabled: boolean) => Promise<void>;
+  setStylePreview: (map: Record<string,string> | null) => Promise<void>;
   /** Stacks a mod jar over the base pack, adding its blocks to the picker. */
   addModPack: (file: File) => Promise<void>;
   /** As {@link addModPack}, for a jar the dev server found in an instance. */
@@ -886,7 +889,18 @@ export const useStore = create<State & Actions>((set, get) => {
     try {
       const source = get().texturesEnabled ? pack : null;
       if (source && isBedrockPack(basePack)) await prepareBedrockPalette(basePack!, build.palette);
-      const baked = await bakePalette(build, source);
+      const mapped = get().stylePreview;
+      // Replacing the palette for baking changes only geometry/texture
+      // appearance. The original Build/data is never mutated or exported
+      // from the style preview. Styles are always applied from the original.
+      const previewBuild = mapped && Object.keys(mapped).length
+        ? new Build(build.width,build.height,build.length,
+            build.palette.map(state => {
+              const mappedName = mapped[state.name] ?? mapped[state.name.split("[")[0]];
+              return mappedName ? {name:mappedName, properties:state.properties} : state;
+            }), build.data, build.meta)
+        : build;
+      const baked = await bakePalette(previewBuild, source);
       if (source && isBedrockPack(basePack)) relayerPacks();
       // A newer bake started while this one was decoding textures.
       if (token !== bakeToken) return;
@@ -1488,6 +1502,7 @@ export const useStore = create<State & Actions>((set, get) => {
     status: "empty",
     error: null,
     fileName: null,
+    stylePreview: null,
     notice: null,
 
     tool: "move",
@@ -1696,6 +1711,10 @@ export const useStore = create<State & Actions>((set, get) => {
 
     setTexturesEnabled: async (enabled) => {
       set({ texturesEnabled: enabled });
+      await rebake();
+    },
+    setStylePreview: async (map) => {
+      set({ stylePreview: map });
       await rebake();
     },
 
