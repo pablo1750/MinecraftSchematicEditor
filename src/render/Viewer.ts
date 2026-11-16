@@ -96,6 +96,8 @@ function blockMaterial(
   kind: 0 | 1 | 2,
   enabler: THREE.Texture,
   textureUniform: { value: THREE.Texture | null },
+  waterTime: {value:number},
+  waterLayer: {value:number},
   lit = false,
 ): THREE.MeshBasicMaterial | THREE.MeshLambertMaterial {
   const ctor = lit ? THREE.MeshLambertMaterial : THREE.MeshBasicMaterial;
@@ -112,14 +114,22 @@ function blockMaterial(
     // Shared by reference so the texture can be swapped before or after the
     // material has ever been compiled.
     shader.uniforms.blockTextures = textureUniform;
+    shader.uniforms.waterTime = waterTime;
+    shader.uniforms.waterLayer = waterLayer;
     shader.vertexShader =
       "attribute float layer;\nvarying float vLayer;\n" +
       shader.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n\tvLayer = layer;");
     shader.fragmentShader =
-      "precision highp sampler2DArray;\nuniform sampler2DArray blockTextures;\nvarying float vLayer;\n" +
+      "precision highp sampler2DArray;\nuniform sampler2DArray blockTextures;\nuniform float waterTime;\nuniform float waterLayer;\nvarying float vLayer;\n" +
       shader.fragmentShader.replace(
         "#include <map_fragment>",
-        "diffuseColor *= texture( blockTextures, vec3( vMapUv, vLayer ) );",
+        `vec2 waterUv = vMapUv;
+         if (abs(vLayer - waterLayer) < 0.5) {
+           waterUv += vec2(sin((vMapUv.y + waterTime * 0.12) * 22.0) * 0.018,
+             waterTime * 0.012);
+           waterUv = fract(waterUv);
+         }
+         diffuseColor *= texture(blockTextures, vec3(waterUv, vLayer));`,
       );
   };
   material.customProgramCacheKey = () => `block-array-${kind}-${lit ? "lit" : "flat"}`;
@@ -180,6 +190,8 @@ export class Viewer {
   private grid: THREE.Object3D | null = null;
 
   private textureUniform: { value: THREE.Texture | null } = { value: null };
+  private waterTime = {value:0};
+  private waterLayer = {value:-1};
   private materials: (THREE.MeshBasicMaterial | THREE.MeshLambertMaterial)[];
   private litMaterials: (THREE.MeshBasicMaterial | THREE.MeshLambertMaterial)[];
   private sun = new THREE.DirectionalLight(0xfff0d6, 1);
@@ -309,14 +321,14 @@ export class Viewer {
 
     const enabler = uvEnablerTexture();
     this.materials = [
-      blockMaterial(0, enabler, this.textureUniform),
-      blockMaterial(1, enabler, this.textureUniform),
-      blockMaterial(2, enabler, this.textureUniform),
+      blockMaterial(0, enabler, this.textureUniform, this.waterTime, this.waterLayer),
+      blockMaterial(1, enabler, this.textureUniform, this.waterTime, this.waterLayer),
+      blockMaterial(2, enabler, this.textureUniform, this.waterTime, this.waterLayer),
     ];
     this.litMaterials = [
-      blockMaterial(0, enabler, this.textureUniform, true),
-      blockMaterial(1, enabler, this.textureUniform, true),
-      blockMaterial(2, enabler, this.textureUniform, true),
+      blockMaterial(0, enabler, this.textureUniform, this.waterTime, this.waterLayer, true),
+      blockMaterial(1, enabler, this.textureUniform, this.waterTime, this.waterLayer, true),
+      blockMaterial(2, enabler, this.textureUniform, this.waterTime, this.waterLayer, true),
     ];
     this.sun.visible = false;
     this.sky.visible = false;
@@ -2038,6 +2050,7 @@ export class Viewer {
       this.onProgress(this.dirtyQueue.length);
     }
 
+    this.waterTime.value = performance.now() * 0.001;
     this.renderer.render(this.scene, this.camera);
     this.labelRenderer.render(this.scene, this.camera);
   };
