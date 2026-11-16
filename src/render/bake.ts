@@ -86,6 +86,8 @@ export interface BakedBlock {
   paneParts?: BakedQuad[][];
   /** Post plus four pairs of horizontal rails, N/E/S/W. */
   fenceParts?: BakedQuad[][];
+  /** Fluid geometry is blended and neighbouring water faces are merged. */
+  waterHeight?: number;
 }
 
 export interface BakedPalette {
@@ -572,6 +574,7 @@ export async function bakePalette(build: Build, pack: ResourcePack | null): Prom
       blocks.push({
         parts:[[quads]],single:quads,occludes:new Uint8Array(6),
         layer:2,ao:false,empty:false,fromModel:true,
+        waterHeight:waterHeight(state),
       });
       textured=true;
       continue;
