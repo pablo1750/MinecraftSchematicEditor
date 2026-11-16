@@ -83,6 +83,8 @@ export interface BakedBlock {
   fromModel: boolean;
   /** Centre plus north/east/south/west arms; selected from neighbours at mesh time. */
   paneParts?: BakedQuad[][];
+  /** Post plus four pairs of horizontal rails, N/E/S/W. */
+  fenceParts?: BakedQuad[][];
 }
 
 export interface BakedPalette {
@@ -460,6 +462,71 @@ function bakePaneParts(
   });
 }
 
+/* ------------------------------------------------------- connected fences */
+
+/** Each fence has one centre post and two rails for each connected side. */
+function isFence(id: string): boolean {
+  return id.endsWith("_fence") && !id.endsWith("_fence_gate");
+}
+
+const FENCE_BOX_GROUPS: readonly (readonly Box[])[] = [
+  [[6/16, 0, 6/16, 10/16, 1, 10/16]], // centre post
+  [
+    [7/16, 6/16, 0, 9/16, 9/16, 6/16],
+    [7/16, 12/16, 0, 9/16, 15/16, 6/16],
+  ], // north
+  [
+    [10/16, 6/16, 7/16, 1, 9/16, 9/16],
+    [10/16, 12/16, 7/16, 1, 15/16, 9/16],
+  ], // east
+  [
+    [7/16, 6/16, 10/16, 9/16, 9/16, 1],
+    [7/16, 12/16, 10/16, 9/16, 15/16, 1],
+  ], // south
+  [
+    [0, 6/16, 7/16, 6/16, 9/16, 9/16],
+    [0, 12/16, 7/16, 6/16, 15/16, 9/16],
+  ], // west
+];
+
+/** Bake reusable fence pieces with the current pack's texture, or flat colours. */
+function bakeFenceParts(
+  state: BlockState,
+  resolved: ReturnType<typeof resolveState>,
+  textures: TextureArrayBuilder,
+): BakedQuad[][] {
+  if (!resolved?.[0]?.[0]?.model.elements.length) {
+    return FENCE_BOX_GROUPS.map((group) =>
+      group.flatMap((box) => bakeFallback(state, [box]).quads));
+  }
+  const placement = resolved[0][0];
+  const model = placement.model;
+  const reference = model.elements[0].faces;
+  const tint = tintFor(state.name, state.properties);
+  return FENCE_BOX_GROUPS.map((group) => {
+    const quads: BakedQuad[] = [];
+    for (const box of group) {
+      const faces: ElementDef["faces"] = {};
+      for (const face of Object.keys(FACE_NAMES) as FaceName[]) {
+        const source = reference[face] ?? reference.north ?? reference.south ??
+          reference.east ?? reference.west ?? reference.up ?? reference.down;
+        if (!source) continue;
+        faces[face] = {
+          texture: source.texture,
+          ...(source.tintindex === undefined ? {} : { tintindex: source.tintindex }),
+        };
+      }
+      const element: ElementDef = {
+        from: [box[0]*16, box[1]*16, box[2]*16],
+        to: [box[3]*16, box[4]*16, box[5]*16],
+        faces,
+      };
+      bakeElement(element, { ...placement, x: 0, y: 0 }, model, textures, tint, quads);
+    }
+    return quads;
+  });
+}
+
 /* ------------------------------------------------------------------ entry */
 
 /** Blocks vanilla blends rather than alpha-tests. */
@@ -504,6 +571,21 @@ export async function bakePalette(build: Build, pack: ResourcePack | null): Prom
         occludes: new Uint8Array(6),
         layer: fromModel ? 0 : 2,
         ao: false, empty: false, fromModel,
+      });
+      continue;
+    }
+
+    // Real-world connections depend on neighbours, not palette blockstates.
+    // Cache the post and four rail pairs, and select them in meshRegion.
+    if (isFence(id)) {
+      const fenceParts = bakeFenceParts(state, resolved, textures);
+      const fromModel = !!resolved?.[0]?.[0]?.model.elements.length;
+      if (!fromModel && pack) missing.push(state.name);
+      if (fromModel) textured = true;
+      blocks.push({
+        parts: [], single: null, fenceParts,
+        occludes: new Uint8Array(6),
+        layer: 0, ao: false, empty: false, fromModel,
       });
       continue;
     }
