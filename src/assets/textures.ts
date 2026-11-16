@@ -125,6 +125,7 @@ export const GRAIN_LAYER = 0;
 export class TextureArrayBuilder {
   private order: string[] = [];
   private index = new Map<string, number>();
+  private synthetic = new Map<string, DecodedTexture>();
 
   constructor(private pack: ResourcePack | null) {}
 
@@ -139,11 +140,24 @@ export class TextureArrayBuilder {
     return layer;
   }
 
+  /** Add procedural pixel art without depending on Java/Bedrock water assets. */
+  generatedLayer(key:string, image:DecodedTexture):number {
+    this.synthetic.set(key,image);
+    const old=this.index.get(key);
+    if(old!==undefined)return old;
+    const id=this.order.length+1;
+    this.index.set(key,id);
+    this.order.push(key);
+    return id;
+  }
+
   async build(): Promise<BuiltTextures> {
     const decoded: (DecodedTexture | null)[] = await Promise.all(
       this.order.map((path) => {
-        const bytes = this.pack!.textures.get(path)!;
-        return decodeTexture(bytes);
+        const generated=this.synthetic.get(path);
+        if(generated)return Promise.resolve(generated);
+        const bytes=this.pack?.textures.get(path);
+        return bytes ? decodeTexture(bytes) : Promise.resolve(null);
       }),
     );
 
