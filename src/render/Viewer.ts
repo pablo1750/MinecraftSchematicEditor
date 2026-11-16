@@ -1554,6 +1554,7 @@ export class Viewer {
       this.simulationOriginalBaked = this.baked;
       this.build = this.build!.clone();
       this.emittedLights=collectBlockLights(this.build);
+      for(const light of this.nearbyLights){light.visible=true;light.intensity=0;}
       this.lastLightCell="";
       this.lastLightUpdate=0;
       this.simulationFog = this.scene.fog as THREE.Fog | THREE.FogExp2 | null;
@@ -1687,12 +1688,11 @@ export class Viewer {
     for(let i=0;i<this.nearbyLights.length;i++){
       const target=this.nearbyLights[i];
       const source=nearest[i];
-      if(!source){target.visible=false;target.intensity=0;continue;}
+      if(!source){target.intensity=0;continue;}
       target.position.set(source.x,source.y,source.z);
       target.color.setHex(source.color);
       target.intensity=source.intensity;
       target.distance=source.radius;
-      target.visible=true;
     }
   }
 
