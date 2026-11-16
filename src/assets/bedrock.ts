@@ -16,6 +16,7 @@ const aliases:Record<string,string> = {
   wall_torch:"torch",
   soul_wall_torch:"soul_torch",
   redstone_wall_torch:"redstone_torch",
+  oak_door:"wooden_door",
 };
 
 async function json<T>(path:string):Promise<T> {
@@ -117,10 +118,12 @@ export function wallTorchElements(texture:string, facing:string | undefined):Ele
     axis:"x"|"z";
     angle:number;
   }> = {
-    north:{from:[7,3,10],to:[9,13,12],origin:[8,3,11],axis:"x",angle:-22.5},
-    south:{from:[7,3,4],to:[9,13,6],origin:[8,3,5],axis:"x",angle:22.5},
-    east:{from:[4,3,7],to:[6,13,9],origin:[5,3,8],axis:"z",angle:-22.5},
-    west:{from:[10,3,7],to:[12,13,9],origin:[11,3,8],axis:"z",angle:22.5},
+    // Start against the supporting wall, then lean into the cell.
+    // "facing" is the direction away from the supporting wall.
+    north:{from:[7,3,13],to:[9,13,15],origin:[8,3,15],axis:"x",angle:-22.5},
+    south:{from:[7,3,1],to:[9,13,3],origin:[8,3,1],axis:"x",angle:22.5},
+    east:{from:[1,3,7],to:[3,13,9],origin:[1,3,8],axis:"z",angle:-22.5},
+    west:{from:[13,3,7],to:[15,13,9],origin:[15,3,8],axis:"z",angle:22.5},
   };
   const d=configuration[direction];
   const side={texture,uv:[7,6,9,16] as [number,number,number,number]};
@@ -132,6 +135,79 @@ export function wallTorchElements(texture:string, facing:string | undefined):Ele
       north:side,south:side,east:side,west:side,
       up:{texture,uv:[7,6,9,8]},
       down:{texture,uv:[7,13,9,15]},
+    },
+  }];
+}
+
+/**
+ * Bedrock's legacy door_upper/door_lower atlases are ordered by wood species.
+ * Generic textureFile() intentionally chooses the first frame for most block
+ * textures, but doors must select both their own wood and their own half.
+ */
+const LEGACY_DOOR_INDEX:Record<string,number> = {
+  oak_door:0, spruce_door:1, birch_door:2, jungle_door:3,
+  acacia_door:4, dark_oak_door:5, iron_door:6,
+};
+
+export function doorTexturePath(
+  id:string,
+  half:"upper"|"lower",
+  terrain:Record<string,TextureDef>,
+):string | null {
+  const legacy=LEGACY_DOOR_INDEX[id];
+  if (legacy !== undefined) {
+    const list=terrain[half==="upper" ? "door_upper" : "door_lower"]?.textures;
+    const variant=Array.isArray(list) ? list[legacy] : null;
+    return typeof variant==="string" ? variant : variant?.path ?? null;
+  }
+  const suffix=half==="upper" ? ["_top","_upper"] : ["_bottom","_lower"];
+  for (const ending of suffix) {
+    const key=id+ending;
+    const found=textureFile(terrain[key]);
+    if(found) return found;
+  }
+  return null;
+}
+
+/**
+ * Java facing points away from the closed door face. The door is a thin
+ * 3-pixel slab at the rear of its cell. Opening swings this slab 90 degrees
+ * around the left/right hinge to the corresponding side of the cell.
+ * Upper and lower halves use identical positions and different PNG sprites.
+ */
+export function doorElements(
+  texture:string,
+  properties:Record<string,string> | undefined,
+):ElementDef[] {
+  const facing=["north","south","east","west"].includes(properties?.facing ?? "")
+    ? properties!.facing : "north";
+  const open=properties?.open==="true" || properties?.open_bit==="true" ||
+    properties?.open_bit==="1";
+  const right=properties?.hinge==="right" || properties?.door_hinge_bit==="true" ||
+    properties?.door_hinge_bit==="1";
+  const closed:Record<string,[number,number,number,number,number,number]>={
+    north:[0,0,13,16,16,16], south:[0,0,0,16,16,3],
+    east:[0,0,0,3,16,16], west:[13,0,0,16,16,16],
+  };
+  const opened:Record<string,[[number,number,number,number,number,number],[number,number,number,number,number,number]]>={
+    north:[[0,0,0,3,16,16],[13,0,0,16,16,16]],
+    south:[[13,0,0,16,16,16],[0,0,0,3,16,16]],
+    east:[[0,0,0,16,16,3],[0,0,13,16,16,16]],
+    west:[[0,0,13,16,16,16],[0,0,0,16,16,3]],
+  };
+  const bounds=open ? opened[facing][right?1:0] : closed[facing];
+  const [x0,y0,z0,x1,y1,z1]=bounds;
+  const alongX=(x1-x0)> (z1-z0);
+  const wide={texture,uv:[0,0,16,16] as [number,number,number,number]};
+  const edge={texture,uv:[0,0,3,16] as [number,number,number,number]};
+  const cap={texture,uv:[0,0,16,3] as [number,number,number,number]};
+  return [{
+    from:[x0,y0,z0],to:[x1,y1,z1],
+    shade:false,
+    faces:{
+      north:alongX?wide:edge,south:alongX?wide:edge,
+      east:alongX?edge:wide,west:alongX?edge:wide,
+      up:cap,down:cap,
     },
   }];
 }
@@ -156,7 +232,17 @@ export async function prepareBedrockPalette(pack:ResourcePack,palette:BlockState
       needed.add(path);
     }
     if (!valid) continue;
-    // Lanterns use a single PNG atlas with per-part UVs, not generic block mapping.
+    // Doors need their own upper/lower texture rather than generic
+    // Bedrock's "door_lower"/"door_upper" arrays' first (oak) entry.
+    const isDoor=id.endsWith("_door") && !id.endsWith("_trapdoor");
+    const half: "upper" | "lower" =
+      state.properties?.half==="upper" || state.properties?.upper_block_bit==="true" ||
+      state.properties?.upper_block_bit==="1" ? "upper" : "lower";
+    const doorPath=isDoor ? doorTexturePath(id,half,meta.terrain) : null;
+    if(doorPath && /^textures\/blocks\/[\w/-]+$/.test(doorPath)) needed.add(doorPath);
+    const doorTexture=doorPath && /^textures\/blocks\/[\w/-]+$/.test(doorPath)
+      ? "minecraft:block/bedrock/"+doorPath.slice("textures/blocks/".length) : null;
+    // Lanterns and torches are small UV atlases, not tileable cuboid faces.
     const isLantern=id==="lantern" || id==="soul_lantern";
     const atlas=keys.up;
     const isWallTorch=id==="wall_torch" || id==="soul_wall_torch" ||
@@ -166,6 +252,8 @@ export async function prepareBedrockPalette(pack:ResourcePack,palette:BlockState
       : isLantern && atlas
       ? lanternElements(atlas,state.properties?.hanging==="true" ||
           state.properties?.hanging_bit==="true" || state.properties?.hanging_bit==="1")
+      : isDoor && doorTexture
+      ? doorElements(doorTexture,state.properties)
       : lookFor(state).boxes.map(box=>{
       const from:[number,number,number]=[box[0]*16,box[1]*16,box[2]*16];
       const to:[number,number,number]=[box[3]*16,box[4]*16,box[5]*16];
