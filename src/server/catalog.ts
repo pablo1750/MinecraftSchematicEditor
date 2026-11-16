@@ -9,6 +9,9 @@ export interface ConstruccionServidor {
   descripcion?: string;
   imagen?: string;
   editor_schem?: string;
+  estilos_editor?: EstiloEditor[];
+  estilos_disponibles?: string[];
+  estilos?: {name:string;map?:Record<string,string>;cells?:unknown;del?:unknown;cellsOn?:unknown}[];
   original_schem?: string;
   original_litematic?: string;
   original_schematic?: string;
@@ -104,4 +107,52 @@ export async function guardarConstruccion(
   const body = await response.json() as { ok: boolean; data?: ConstruccionServidor; error?: string };
   if (!body.ok || !body.data) throw new Error(body.error ?? "No se pudo guardar.");
   return body.data;
+}
+
+export interface EstiloEditor {
+  id: string;
+  nombre: string;
+  reemplazos: Record<string,string>;
+  modificaciones?: unknown[];
+}
+export interface EstilosRespuesta {
+  estilos_editor: EstiloEditor[];
+  estilos_importados: {nombre:string;solo_mapa:boolean}[];
+}
+export async function consultarEstilos(source: ConstruccionServidor):Promise<EstilosRespuesta> {
+  const q=new URLSearchParams({
+    accion:"editor_estilos",categoria:source.categoria,id:source.id,
+  });
+  const res=await fetch("/api/construcciones?"+q.toString(),
+    {credentials:"same-origin",cache:"no-store"});
+  await assertResponse(res);
+  const json=await res.json() as {ok:boolean;data?:EstilosRespuesta;error?:string};
+  if (!json.ok || !json.data) throw new Error(json.error??"No se pudieron cargar los estilos.");
+  return json.data;
+}
+export async function guardarEstilo(
+  source:ConstruccionServidor,
+  style:Pick<EstiloEditor,"nombre"|"reemplazos"> & {id?:string},
+):Promise<EstiloEditor> {
+  const res=await fetch("/api/construcciones?accion=editor_estilo_guardar",{
+    method:"POST",credentials:"same-origin",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      categoria:source.categoria,id_construccion:source.id,...style,
+    }),
+  });
+  await assertResponse(res);
+  const json=await res.json() as {ok:boolean;data?:EstiloEditor;error?:string};
+  if(!json.ok || !json.data) throw new Error(json.error??"No se pudo guardar el estilo.");
+  return json.data;
+}
+export async function eliminarEstilo(source:ConstruccionServidor,id:string):Promise<void>{
+  const res=await fetch("/api/construcciones?accion=editor_estilo_eliminar",{
+    method:"POST",credentials:"same-origin",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({categoria:source.categoria,id_construccion:source.id,id}),
+  });
+  await assertResponse(res);
+  const json=await res.json() as {ok:boolean;error?:string};
+  if(!json.ok) throw new Error(json.error??"No se pudo eliminar el estilo.");
 }
