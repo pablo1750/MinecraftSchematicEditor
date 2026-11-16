@@ -13,6 +13,9 @@ const aliases:Record<string,string> = {
   grass_block:"grass", stone_bricks:"stonebrick", mossy_stone_bricks:"stonebrick",
   cracked_stone_bricks:"stonebrick", chiseled_stone_bricks:"stonebrick",
   flowering_azalea_leaves:"azalea_leaves_flowered",
+  wall_torch:"torch",
+  soul_wall_torch:"soul_torch",
+  redstone_wall_torch:"redstone_torch",
 };
 
 async function json<T>(path:string):Promise<T> {
@@ -95,6 +98,44 @@ function lanternElements(texture:string,hanging:boolean):ElementDef[] {
   return [main,cap,cross1,cross2];
 }
 
+/**
+ * Bedrock reuses the standing torch textures for wall torches. The atlas
+ * contains the sprite centred in a 16px tile, so using it across a wide box
+ * turns the torch into a wooden shelf. Draw the 2x10px shaft with proper UVs,
+ * tilt it 22.5 degrees out from its supporting wall and leave ground torches
+ * unchanged.
+ */
+export function wallTorchElements(texture:string, facing:string | undefined):ElementDef[] {
+  // "facing" means the direction away from the supporting wall in Java.
+  // Rotate the shaft away from the wall, not back into it.
+  const direction = facing==="south" || facing==="east" || facing==="west"
+    ? facing : "north";
+  const configuration:Record<string,{
+    from:[number,number,number];
+    to:[number,number,number];
+    origin:[number,number,number];
+    axis:"x"|"z";
+    angle:number;
+  }> = {
+    north:{from:[7,3,10],to:[9,13,12],origin:[8,3,11],axis:"x",angle:-22.5},
+    south:{from:[7,3,4],to:[9,13,6],origin:[8,3,5],axis:"x",angle:22.5},
+    east:{from:[4,3,7],to:[6,13,9],origin:[5,3,8],axis:"z",angle:-22.5},
+    west:{from:[10,3,7],to:[12,13,9],origin:[11,3,8],axis:"z",angle:22.5},
+  };
+  const d=configuration[direction];
+  const side={texture,uv:[7,6,9,16] as [number,number,number,number]};
+  return [{
+    from:d.from,to:d.to,
+    rotation:{origin:d.origin,axis:d.axis,angle:d.angle},
+    shade:false,
+    faces:{
+      north:side,south:side,east:side,west:side,
+      up:{texture,uv:[7,6,9,8]},
+      down:{texture,uv:[7,13,9,15]},
+    },
+  }];
+}
+
 /** Generate compatible models for the current build; preserve the existing block geometry. */
 export async function prepareBedrockPalette(pack:ResourcePack,palette:BlockState[]):Promise<void> {
   const meta=metadata.get(pack);
@@ -118,7 +159,11 @@ export async function prepareBedrockPalette(pack:ResourcePack,palette:BlockState
     // Lanterns use a single PNG atlas with per-part UVs, not generic block mapping.
     const isLantern=id==="lantern" || id==="soul_lantern";
     const atlas=keys.up;
-    const elements:ElementDef[]=isLantern && atlas
+    const isWallTorch=id==="wall_torch" || id==="soul_wall_torch" ||
+      id==="redstone_wall_torch";
+    const elements:ElementDef[]=isWallTorch && atlas
+      ? wallTorchElements(atlas,state.properties?.facing)
+      : isLantern && atlas
       ? lanternElements(atlas,state.properties?.hanging==="true" ||
           state.properties?.hanging_bit==="true" || state.properties?.hanging_bit==="1")
       : lookFor(state).boxes.map(box=>{
