@@ -278,7 +278,7 @@ export default function App() {
         onToggleProperties={() => setPropertiesVisible((visible) => !visible)}
         onSave={() => serverPropertiesRef.current?.save()}
         stylesEnabled={sourceIsCurrent && serverMode==="editar"}
-        onStyles={() => {setPropertiesVisible(false);setStylesVisible(v=>!v);}} />
+        onStyles={() => {setPropertiesVisible(false);setStylesVisible(true);}} />
       <DocTabs />
       {build && <ToolRail />}
 
