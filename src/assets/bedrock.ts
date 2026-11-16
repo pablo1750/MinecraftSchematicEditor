@@ -12,6 +12,7 @@ const faces:FaceName[] = ["down","up","north","south","west","east"];
 const aliases:Record<string,string> = {
   grass_block:"grass", stone_bricks:"stonebrick", mossy_stone_bricks:"stonebrick",
   cracked_stone_bricks:"stonebrick", chiseled_stone_bricks:"stonebrick",
+  flowering_azalea_leaves:"azalea_leaves_flowered",
 };
 
 async function json<T>(path:string):Promise<T> {
