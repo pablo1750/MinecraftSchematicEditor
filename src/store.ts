@@ -151,6 +151,7 @@ interface State {
   /** Visual-only material substitutions for the selected editor style. */
   stylePreview: Record<string, string> | null;
   styleEditing: boolean;
+  styleWritable: boolean;
   /** Transient one-line message: what a canvas edit did, or why it couldn't. */
   notice: string | null;
 
@@ -358,7 +359,7 @@ interface Actions {
   clearResourcePack: () => Promise<void>;
   setTexturesEnabled: (enabled: boolean) => Promise<void>;
   setStylePreview: (map: Record<string,string> | null) => Promise<void>;
-  beginStyleEditing: (map:Record<string,string>, changes:StyleCell[]) => void;
+  beginStyleEditing: (map:Record<string,string>, changes:StyleCell[], writable?:boolean) => void;
   changeStyleMap: (map:Record<string,string>) => void;
   styleChanges: () => StyleCell[];
   endStyleEditing: () => void;
@@ -704,7 +705,7 @@ export const useStore = create<State & Actions>((set, get) => {
   /** Applies an edit, records it for undo, and tells the viewer what moved. */
   function commit(label: string, indices: Uint32Array, after: Uint16Array) {
     const build = get().build;
-    if (!build || indices.length === 0 || (get().stylePreview !== null && !get().styleEditing)) return;
+    if (!build || indices.length === 0 || (get().styleEditing && !get().styleWritable) || (get().stylePreview !== null && !get().styleEditing)) return;
 
     // Fences, panes and walls keep their connections in the blockstate, and the
     // game recomputes them on every placement. The joins an edit implies — for
@@ -1516,6 +1517,7 @@ export const useStore = create<State & Actions>((set, get) => {
     fileName: null,
     stylePreview: null,
     styleEditing: false,
+    styleWritable: false,
     notice: null,
 
     tool: "move",
@@ -1731,13 +1733,13 @@ export const useStore = create<State & Actions>((set, get) => {
       if (map !== null) set({ tool: "move" });
       await rebake();
     },
-    beginStyleEditing: (map, changes) => {
+    beginStyleEditing: (map, changes, writable = false) => {
       if (!styleOriginal) styleOriginal = get().build;
       if (!styleOriginal) return;
       const {base,working}=composeStyle(styleOriginal,map,changes);
       styleBaseline=base;
       installBuild(working);
-      set({build:working,styleEditing:true,stylePreview:null,
+      set({build:working,styleEditing:true,styleWritable:writable,stylePreview:null,
         undoStack:[],redoStack:[],structuralUndo:null,
         revision:get().revision+1,selectedMaterial:null,
         notice:"Modo estilo: editá los bloques sin alterar la construcción original."});
@@ -1747,7 +1749,7 @@ export const useStore = create<State & Actions>((set, get) => {
     changeStyleMap: (map) => {
       if (!styleOriginal || !styleBaseline || !get().build) return;
       const changes=styleDifferences(styleBaseline,get().build!);
-      get().beginStyleEditing(map,changes);
+      get().beginStyleEditing(map,changes,get().styleWritable);
     },
     styleChanges: () => {
       const current=get().build;
@@ -1760,7 +1762,7 @@ export const useStore = create<State & Actions>((set, get) => {
       styleBaseline=null;
       installBuild(original);
       const record=docRecords.find(doc=>doc.id===get().activeDoc);
-      set({build:original,styleEditing:false,stylePreview:null,
+      set({build:original,styleEditing:false,styleWritable:false,stylePreview:null,
         undoStack:record?.undoStack??[],redoStack:record?.redoStack??[],
         structuralUndo:record?.structuralUndo??null,
         selectedMaterial:null,revision:get().revision+1,
@@ -2041,6 +2043,7 @@ export const useStore = create<State & Actions>((set, get) => {
     },
 
     setTool: (tool) => {
+      if (get().styleEditing && !get().styleWritable && tool !== "move") return;
       // Reaching for the eyedropper is always an interruption of something else;
       // remember what, so the pick can put it back in your hand. Choosing any
       // other tool by hand answers the question itself.
