@@ -37,8 +37,9 @@ try {
   const diff=styleDifferences(base,working);
   assert.deepEqual(diff.sort((a,b)=>a.x-b.x),changes.sort((a,b)=>a.x-b.x));
   const reloaded=composeStyle(original,replacements,diff);
-  assert.deepEqual([...reloaded.working.data],[...working.data],
-    "style round-trips with no full schematic copy");
+  const snapshot=(build)=>[...build.data].map(i=>stateKey(build.palette[i]));
+  assert.deepEqual(snapshot(reloaded.working),snapshot(working),
+    "style round-trips with the same blockstates (palette indices may differ)");
   const differentMap={"minecraft:stone_bricks":"minecraft:gold_block"};
   const changedMap=composeStyle(original,differentMap,diff);
   assert.equal(changedMap.working.palette[changedMap.working.at(1,0,1)].name,
