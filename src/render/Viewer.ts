@@ -543,6 +543,7 @@ export class Viewer {
     const previous = this.textureUniform.value;
     this.baked = baked;
     this.textureUniform.value = baked.texture;
+    this.waterLayer.value = baked.texturePaths.indexOf("<water-procedural>");
     if (previous && previous !== baked.texture &&
         previous !== this.simulationOriginalBaked?.texture) previous.dispose();
     this.invalidateAll();
