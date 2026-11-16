@@ -80,17 +80,17 @@ export function BlockPicker({ title, onPick, onClose }: Props) {
   );
 
   const knownIds = useMemo(() => new Set([
-    ...inBuild,
     ...catalogue.flatMap(group => group.blocks),
     ...modCatalogue.flatMap(group => group.blocks),
-  ]), [inBuild, catalogue, modCatalogue]);
+  ]), [catalogue, modCatalogue]);
 
   const groups = useMemo(() => {
-    const all = [
-      { name: "Already in this build", blocks: inBuild },
-      ...catalogue,
-      ...modCatalogue,
-    ];
+    // Search real catalogue entries first. A legacy invalid block in a
+    // schematic (e.g. minecraft:agua) must not outrank minecraft:water.
+    const used = { name: "Already in this build", blocks: inBuild };
+    const all = query.trim()
+      ? [...catalogue, ...modCatalogue, used]
+      : [used, ...catalogue, ...modCatalogue];
     if (!query.trim()) return all;
     return all
       .map((group) => ({
