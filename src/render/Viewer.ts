@@ -273,6 +273,9 @@ export class Viewer {
   private simulation = false;
   private walkBody: Walker | null = null;
   private walkKeys = new Set<string>();
+  private walkFlying = false;
+  private lastSpacePress = -Infinity;
+  private suppressSpaceUntilRelease = false;
   private lastFrameTime = 0;
   private editorPose: { position: THREE.Vector3; quaternion: THREE.Quaternion; layer: number } | null = null;
   onSimulationExit: () => void = () => {};
@@ -1520,6 +1523,23 @@ export class Viewer {
   /** Simulation listeners are completely independent of editor gestures. */
   private onWalkKeyDown = (event: KeyboardEvent) => {
     if (!this.simulation) return;
+    if (event.code === "Space" && !event.repeat) {
+      event.preventDefault();
+      const now = performance.now();
+      if (now - this.lastSpacePress <= 300) {
+        this.walkFlying = !this.walkFlying;
+        if (this.walkBody) {
+          this.walkBody.vy = 0;
+          this.walkBody.grounded = false;
+        }
+        this.lastSpacePress = -Infinity;
+        // The second tap toggles flight, rather than jumping or ascending.
+        this.suppressSpaceUntilRelease = true;
+        this.walkKeys.delete("Space");
+        return;
+      }
+      this.lastSpacePress = now;
+    }
     if (event.code === "KeyE") {
       event.preventDefault();
       void this.interactWithDoor();
@@ -1531,13 +1551,15 @@ export class Viewer {
       return;
     }
     if (["KeyW","KeyA","KeyS","KeyD","ArrowUp","ArrowDown","ArrowLeft",
-      "ArrowRight","Space","ShiftLeft","ShiftRight"].includes(event.code)) {
+      "ArrowRight","Space","ShiftLeft","ShiftRight","ControlLeft","ControlRight"].includes(event.code)) {
       event.preventDefault();
-      this.walkKeys.add(event.code);
+      if (event.code !== "Space" || !this.suppressSpaceUntilRelease)
+        this.walkKeys.add(event.code);
     }
   };
   private onWalkKeyUp = (event: KeyboardEvent) => {
     this.walkKeys.delete(event.code);
+    if (event.code === "Space") this.suppressSpaceUntilRelease = false;
   };
   private onWalkMouseMove = (event: MouseEvent) => {
     if (!this.simulation || document.pointerLockElement !== this.renderer.domElement) return;
@@ -1548,7 +1570,11 @@ export class Viewer {
       this.onSimulationExit();
     }
   };
-  private onWalkBlur = () => this.walkKeys.clear();
+  private onWalkBlur = () => {
+    this.walkKeys.clear();
+    this.lastSpacePress = -Infinity;
+    this.suppressSpaceUntilRelease = false;
+  };
 
   /**
    * Walk mode keeps its own camera position, keyboard and pointer lock.
@@ -1607,6 +1633,9 @@ export class Viewer {
       if (this.grid) this.grid.visible = false;
       this.labelRenderer.domElement.style.display = "none";
       this.walkKeys.clear();
+      this.walkFlying = false;
+      this.lastSpacePress = -Infinity;
+      this.suppressSpaceUntilRelease = false;
       this.lastFrameTime = performance.now();
       window.addEventListener("keydown",this.onWalkKeyDown);
       window.addEventListener("keyup",this.onWalkKeyUp);
@@ -1625,6 +1654,9 @@ export class Viewer {
       if (document.pointerLockElement === this.renderer.domElement)
         document.exitPointerLock();
       this.walkKeys.clear();
+      this.walkFlying = false;
+      this.lastSpacePress = -Infinity;
+      this.suppressSpaceUntilRelease = false;
       this.walkBody = null;
       this.renderer.shadowMap.enabled = false;
       this.sun.visible = false;
@@ -1670,7 +1702,11 @@ export class Viewer {
       right:Number(keys.has("KeyD")||keys.has("ArrowRight"))-
         Number(keys.has("KeyA")||keys.has("ArrowLeft")),
       yaw,jump:keys.has("Space"),
-      sprint:keys.has("ShiftLeft")||keys.has("ShiftRight"),
+      flying:this.walkFlying,
+      descend:this.walkFlying && (keys.has("ShiftLeft")||keys.has("ShiftRight")),
+      sprint:this.walkFlying
+        ? keys.has("ControlLeft")||keys.has("ControlRight")
+        : keys.has("ShiftLeft")||keys.has("ShiftRight"),
     },dt);
     this.walkBody=next;
     this.camera.position.set(next.x,next.y+WALK_EYE_HEIGHT,next.z);
