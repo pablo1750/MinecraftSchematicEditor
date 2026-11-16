@@ -33,9 +33,18 @@ junto a la cámara y un color de niebla diurna. Estas opciones solo funcionan
 durante la simulación; al regresar al editor se restauran sus materiales, luz
 y cámara originales, evitando el coste permanente de las sombras.
 
-**Importante:** es una aproximación visual eficiente, no una réplica del
-motor de iluminación en vóxeles de Minecraft. Todavía no calcula propagación
-de luz entre habitaciones ni múltiples luces locales de cada antorcha.
+Cada antorcha, farol, fogata encendida y demás bloque emisor detectado
+en la construcción genera su propia luz puntual. **No existe límite de ocho
+luces ni recorte por distancia al personaje**, incluso si la fuente está a
+más de 40 bloques. Cada emisor conserva su atenuación local y color
+(tonos cálidos para fuego convencional, fríos para fuego de almas). Al salir
+de la simulación se liberan todas las luces dinámicas.
+
+**Importante:** sigue siendo una aproximación visual, no la propagación por
+vóxeles de Minecraft. Las luces puntuales no proyectan sombras individuales:
+las sombras proyectadas corresponden a la luz solar. Usar todos los emisores
+es apropiado para construcciones pequeñas, aunque un edificio con cientos de
+antorchas puede afectar el rendimiento de GPU.
 
 ## Puertas interactivas
 
