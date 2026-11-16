@@ -13,7 +13,7 @@ try{
   }
   assert.equal(emissionFor(as("stone")),null,"stone is unlit");
   assert.equal(emissionFor(as("redstone_lamp",{lit:"false"})),null,"off lamp unlit");
-  assert.equal(emissionFor(as("redstone_lamp",{lit:"true"})).radius,10);
+  assert.equal(emissionFor(as("redstone_lamp",{lit:"true"})).radius,12);
   assert.equal(emissionFor(as("campfire",{lit:"false"})),null,"extinguished fire unlit");
   assert.equal(emissionFor(as("soul_torch")).color,0x55dfff,"soul fire cool blue");
   const normalTorch=emissionFor(as("torch"));
