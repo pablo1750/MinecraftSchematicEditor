@@ -1,7 +1,7 @@
 /** Bedrock resource adapter; assets live on the server, never in Git. */
 import { baseName, stateKey, type BlockState } from "../core/model";
 import { lookFor } from "../core/blockLook";
-import type { FaceName, ElementDef, ResourcePack } from "./pack";
+import type { FaceName, ElementDef, ResourcePack, BlockstateDef } from "./pack";
 
 const ROOT = "/data/textures/debrock";
 type BlockDef = { textures?: string | Record<string,string> };
@@ -75,7 +75,7 @@ export async function prepareBedrockPalette(pack:ResourcePack,palette:BlockState
     const props=Object.entries(state.properties??{}).sort(([a],[b])=>a.localeCompare(b))
       .map(([k,v])=>k+"="+v).join(",");
     const blockId="minecraft:"+id;
-    const current=pack.blockstates.get(blockId)??{variants:{}};
+    const current:BlockstateDef=pack.blockstates.get(blockId)??{variants:{}};
     current.variants??={};
     current.variants[props]={model};
     pack.blockstates.set(blockId,current);
