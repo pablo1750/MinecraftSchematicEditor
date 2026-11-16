@@ -12,6 +12,7 @@ import type { BrushShape } from "../core/brush";
 import { mirrorImages, planePosition, type MirrorConfig } from "../core/mirror";
 import { meshRegion, type MeshData } from "./mesher";
 import { rotateCameraInPlace, panUnitsPerPixel, zoomAdvance } from "./cameraNavigation";
+import { advanceWalker, findWalkSpawn, WALK_EYE_HEIGHT, type Walker } from "./walkSimulation";
 import type { BakedPalette } from "./bake";
 
 // Colours here mirror the CSS tokens in styles.css.
@@ -239,6 +240,12 @@ export class Viewer {
   /** Distancia de referencia del zoom/pan; ambos conservan una velocidad mínima del 10%. */
   private navigationReference = 16;
   private navigationScale = 16;
+  private simulation = false;
+  private walkBody: Walker | null = null;
+  private walkKeys = new Set<string>();
+  private lastFrameTime = 0;
+  private editorPose: { position: THREE.Vector3; quaternion: THREE.Quaternion; layer: number } | null = null;
+  onSimulationExit: () => void = () => {};
 
   /** Fired on every pointer move over the build. */
   onHover: (hit: BlockHit | null) => void = () => {};
@@ -398,6 +405,7 @@ export class Viewer {
   }
 
   dispose() {
+    this.setSimulation(false);
     cancelAnimationFrame(this.frameHandle);
     this.resizeObserver.disconnect();
     this.detachInput();
@@ -1299,6 +1307,7 @@ export class Viewer {
   /* ----------------------------------------------------------------- input */
 
   private onPointerMove = (event: PointerEvent) => {
+    if (this.simulation) return;
     const rect = this.renderer.domElement.getBoundingClientRect();
     this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -1345,6 +1354,7 @@ export class Viewer {
   /** Zoom hacia el cursor, conservando el avance mínimo del 10%. */
   private onNavigationWheel = (event: WheelEvent) => {
     event.preventDefault();
+    if (this.simulation) return;
     event.stopImmediatePropagation();
     const { travel, nextScale } = zoomAdvance(
       this.navigationScale, this.navigationReference, event.deltaY, event.deltaMode);
@@ -1362,6 +1372,12 @@ export class Viewer {
   private painting = false;
 
   private onPointerDown = (event: PointerEvent) => {
+    if (this.simulation) {
+      if (event.button === 0 && document.pointerLockElement !== this.renderer.domElement) {
+        void this.renderer.domElement.requestPointerLock();
+      }
+      return;
+    }
     // Giro siempre con el botón derecho. El izquierdo desplaza solo cuando
     // no hay una herramienta editando; en edición conserva su acción sobre
     // bloques y el botón central permite desplazar la vista.
@@ -1400,6 +1416,7 @@ export class Viewer {
   };
 
   private onPointerUp = (event: PointerEvent) => {
+    if (this.simulation) return;
     if (this.rotatePointer?.id === event.pointerId) {
       this.rotatePointer = null;
       if (this.renderer.domElement.hasPointerCapture(event.pointerId)) {
@@ -1424,6 +1441,7 @@ export class Viewer {
   };
 
   private onPointerLeave = () => {
+    if (this.simulation) return;
     if (this.panPointer || this.rotatePointer) return;
     // A captured marquee drag is meant to run past the edge.
     if (this.marqueeStart) return;
@@ -1434,6 +1452,117 @@ export class Viewer {
     this.showHover(null);
     this.onHover(null);
   };
+
+  /** Simulation listeners are completely independent of editor gestures. */
+  private onWalkKeyDown = (event: KeyboardEvent) => {
+    if (!this.simulation) return;
+    if (event.code === "Escape") {
+      event.preventDefault();
+      this.onSimulationExit();
+      return;
+    }
+    if (["KeyW","KeyA","KeyS","KeyD","ArrowUp","ArrowDown","ArrowLeft",
+      "ArrowRight","Space","ShiftLeft","ShiftRight"].includes(event.code)) {
+      event.preventDefault();
+      this.walkKeys.add(event.code);
+    }
+  };
+  private onWalkKeyUp = (event: KeyboardEvent) => {
+    this.walkKeys.delete(event.code);
+  };
+  private onWalkMouseMove = (event: MouseEvent) => {
+    if (!this.simulation || document.pointerLockElement !== this.renderer.domElement) return;
+    rotateCameraInPlace(this.camera, event.movementX, event.movementY);
+  };
+  private onWalkUnlock = () => {
+    if (this.simulation && document.pointerLockElement !== this.renderer.domElement) {
+      this.onSimulationExit();
+    }
+  };
+  private onWalkBlur = () => this.walkKeys.clear();
+
+  /**
+   * Walk mode keeps its own camera position, keyboard and pointer lock.
+   * Leaving restores the editor camera exactly; no schematic data is touched.
+   */
+  setSimulation(enabled: boolean) {
+    if (enabled === this.simulation) return;
+    if (enabled && !this.build) return;
+    this.simulation = enabled;
+    if (enabled) {
+      this.editorPose = {
+        position: this.camera.position.clone(),
+        quaternion: this.camera.quaternion.clone(),
+        layer: this.yLimit,
+      };
+      this.rotatePointer = null;
+      this.panPointer = null;
+      this.painting = false;
+      const build = this.build!;
+      this.walkBody = findWalkSpawn(build,this.camera.position.x,this.camera.position.z);
+      this.camera.position.set(this.walkBody.x,this.walkBody.y+WALK_EYE_HEIGHT,this.walkBody.z);
+      const heading = new THREE.Euler().setFromQuaternion(this.camera.quaternion,"YXZ");
+      this.camera.quaternion.setFromEuler(new THREE.Euler(0,heading.y,0,"YXZ"));
+      this.setLayerLimit(build.height-1);
+      this.frameGroup.visible = false;
+      this.overlayGroup.visible = false;
+      this.guideGroup.visible = false;
+      this.mirrorGroup.visible = false;
+      if (this.grid) this.grid.visible = false;
+      this.labelRenderer.domElement.style.display = "none";
+      this.walkKeys.clear();
+      this.lastFrameTime = performance.now();
+      window.addEventListener("keydown",this.onWalkKeyDown);
+      window.addEventListener("keyup",this.onWalkKeyUp);
+      window.addEventListener("blur",this.onWalkBlur);
+      document.addEventListener("mousemove",this.onWalkMouseMove);
+      document.addEventListener("pointerlockchange",this.onWalkUnlock);
+      // Clicking the canvas asks for pointer lock under user activation.
+    } else {
+      window.removeEventListener("keydown",this.onWalkKeyDown);
+      window.removeEventListener("keyup",this.onWalkKeyUp);
+      window.removeEventListener("blur",this.onWalkBlur);
+      document.removeEventListener("mousemove",this.onWalkMouseMove);
+      document.removeEventListener("pointerlockchange",this.onWalkUnlock);
+      if (document.pointerLockElement === this.renderer.domElement)
+        document.exitPointerLock();
+      this.walkKeys.clear();
+      this.walkBody = null;
+      this.frameGroup.visible = true;
+      this.overlayGroup.visible = true;
+      this.guideGroup.visible = true;
+      this.mirrorGroup.visible = true;
+      if (this.grid) this.grid.visible = true;
+      this.labelRenderer.domElement.style.display = "";
+      if (this.editorPose) {
+        this.camera.position.copy(this.editorPose.position);
+        this.camera.quaternion.copy(this.editorPose.quaternion);
+        this.setLayerLimit(this.editorPose.layer);
+        this.editorPose = null;
+      }
+      this.lastFrameTime = 0;
+    }
+  }
+
+  private walkFrame(now:number) {
+    const body=this.walkBody;
+    const build=this.build;
+    if (!this.simulation || !body || !build) return;
+    const dt=Math.min(.05,Math.max(0,(now-this.lastFrameTime)/1000));
+    this.lastFrameTime=now;
+    const keys=this.walkKeys;
+    const yaw=new THREE.Euler().setFromQuaternion(this.camera.quaternion,"YXZ").y;
+    const next=advanceWalker(build,body,{
+      forward:Number(keys.has("KeyW")||keys.has("ArrowUp"))-
+        Number(keys.has("KeyS")||keys.has("ArrowDown")),
+      right:Number(keys.has("KeyD")||keys.has("ArrowRight"))-
+        Number(keys.has("KeyA")||keys.has("ArrowLeft")),
+      yaw,jump:keys.has("Space"),
+      sprint:keys.has("ShiftLeft")||keys.has("ShiftRight"),
+    },dt);
+    this.walkBody=next;
+    this.camera.position.set(next.x,next.y+WALK_EYE_HEIGHT,next.z);
+  }
 
   private attachInput() {
     const canvas = this.renderer.domElement;
@@ -1739,7 +1868,8 @@ export class Viewer {
 
   private loop = () => {
     this.frameHandle = requestAnimationFrame(this.loop);
-    this.updateFrameCorner();
+    if (this.simulation) this.walkFrame(performance.now());
+    else this.updateFrameCorner();
 
     // Nothing can be meshed before the palette has been baked, and an edit that
     // grew the palette leaves the old bake short until the new one lands. In
