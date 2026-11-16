@@ -67,6 +67,9 @@ jobs:
       - name: Test physical style edits and air overrides
         run: node scripts/test-style-layers.mjs
 
+      - name: Test first-person walk simulation
+        run: node scripts/test-walk-simulation.mjs
+
       - name: Validate TypeScript
         run: npm run typecheck
 
