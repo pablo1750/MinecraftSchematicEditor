@@ -3,3 +3,6 @@ dist/
 .playwright-mcp/
 *.local
 .DS_Store
+
+# Minecraft resources are installed on the server, not distributed by Git.
+data/textures/
