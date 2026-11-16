@@ -18,7 +18,7 @@ try{
   assert.equal(emissionFor(as("soul_torch")).color,0x55dfff,"soul fire cool blue");
   const normalTorch=emissionFor(as("torch"));
   assert.equal(normalTorch.color,0xffb45a,"torch warm orange/amber, not cold white");
-  assert.ok(normalTorch.intensity>=4.2,"torch brightness improved");
+  assert.ok(normalTorch.intensity>=3 && normalTorch.intensity<=3.5,"torch power balances warm ambient");
   assert.ok(normalTorch.radius>=12,"torch illuminates a wider room");
   const lantern=emissionSamplesFor(as("lantern"));
   const soulLantern=emissionSamplesFor(as("soul_lantern"));
@@ -29,7 +29,25 @@ try{
   ],"lantern lights are distributed across the four sides");
   assert.ok(lantern.every(p=>p.color===0xffc46b),"lantern light is warm yellow");
   assert.ok(soulLantern.every(p=>p.color===0x55dfff),"soul lantern remains cool blue");
-  assert.ok(lantern.every(p=>p.intensity>0 && p.radius>=9),"each lantern face emits usable light");
+  assert.ok(lantern.every(p=>p.intensity>0 && p.intensity<=1 && p.radius>=9),
+    "each lantern face is gently lit without ceiling hotspots");
+  const floorLantern=emissionSamplesFor(as("lantern"));
+  const hangingLantern=emissionSamplesFor(as("lantern",{hanging:"true"}));
+  assert.ok(floorLantern.every(p=>p.dy===0.20),"standing lantern lights moved down");
+  assert.ok(hangingLantern.every(p=>p.dy===0.27),"hanging lantern lights moved down");
+  assert.equal(emissionSamplesFor(as("torch"))[0].dy,0.83,
+    "standing torch source is at the flame tip");
+  const expectedWallTips={
+    north:[0,0.79,0.14],
+    south:[0,0.79,-0.14],
+    east:[-0.14,0.75,0],
+    west:[0.14,0.75,0],
+  };
+  for(const [facing,position] of Object.entries(expectedWallTips)){
+    const actual=emissionSamplesFor(as("wall_torch",{facing}))[0];
+    assert.deepEqual([actual.dx,actual.dy,actual.dz],position,
+      "wall torch flame follows its facing: "+facing);
+  }
   const palette=[as("air"),as("torch"),as("stone"),as("lantern"),as("soul_campfire"),
     as("campfire",{lit:"false"}),as("redstone_lamp",{lit:"true"})];
   const build=new Build(64,4,64,palette,new Uint16Array(64*4*64));
@@ -45,5 +63,5 @@ try{
   assert.equal(lights.filter(l=>l.color===0xffc46b).length,5,"four warm lantern faces plus lamp");
   assert.ok(lights.every(l=>l.radius>0 && l.intensity>0),"valid attenuation");
   assert.deepEqual([...build.data],before,"scan never edits the schematic");
-  console.log("OK: four warm lantern lights, stronger torches, all emitters >40 blocks, no original edits.");
+  console.log("OK: four lowered lantern lights, balanced warm intensity, torch flame positions, distant lights and no original edits.");
 }finally{await server.close();}
