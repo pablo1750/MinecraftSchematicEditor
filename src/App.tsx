@@ -59,6 +59,7 @@ function gridStep(
 export default function App() {
   useLocale(); // Rerenderizar paneles y textos al cambiar de idioma.
   const build = useStore((s) => s.build);
+  const simulation = useStore((s) => s.simulation);
   const fileName = useStore((s) => s.fileName);
   const [serverSource, setServerSource] = useState<ConstruccionServidor | null>(null);
   const [serverLoadedFile, setServerLoadedFile] = useState<string | null>(null);
@@ -93,6 +94,7 @@ export default function App() {
       const target = event.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
       const store = useStore.getState();
+      if (store.simulation) return; // walk mode owns all keyboard controls
 
       if ((event.ctrlKey || event.metaKey) && event.code === "KeyZ") {
         event.preventDefault();
@@ -252,8 +254,9 @@ export default function App() {
     <div
       className="app"
       data-empty={build ? "false" : "true"}
+      data-simulation={simulation ? "true" : "false"}
       onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes("Files")) return;
+        if (simulation || !e.dataTransfer.types.includes("Files")) return;
         e.preventDefault();
         setDragging(true);
         setDropImports(e.shiftKey && !!build);
@@ -266,6 +269,7 @@ export default function App() {
       onDrop={(e) => {
         e.preventDefault();
         setDragging(false);
+        if (simulation) return;
         const file = e.dataTransfer.files?.[0];
         if (!file) return;
         const store = useStore.getState();
