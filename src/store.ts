@@ -152,6 +152,7 @@ interface State {
   stylePreview: Record<string, string> | null;
   styleEditing: boolean;
   styleWritable: boolean;
+  simulation: boolean;
   /** Transient one-line message: what a canvas edit did, or why it couldn't. */
   notice: string | null;
 
@@ -330,6 +331,8 @@ interface State {
 interface Actions {
   attachViewer: (viewer: Viewer | null) => void;
   takePhoto: () => string | null;
+  enterSimulation: () => void;
+  exitSimulation: () => void;
   /** Routes a dropped file to the schematic loader or the pack loader. */
   openAny: (file: File) => Promise<void>;
   openFile: (file: File) => Promise<void>;
@@ -1522,6 +1525,7 @@ export const useStore = create<State & Actions>((set, get) => {
     stylePreview: null,
     styleEditing: false,
     styleWritable: false,
+    simulation: false,
     notice: null,
 
     tool: "move",
@@ -1593,9 +1597,20 @@ export const useStore = create<State & Actions>((set, get) => {
     redoStack: [],
 
     takePhoto: () => viewer?.takePhoto() ?? null,
+    enterSimulation: () => {
+      if (!get().build || !viewer || get().simulation) return;
+      viewer.setSimulation(true);
+      set({simulation:true,hover:null});
+    },
+    exitSimulation: () => {
+      if (!get().simulation) return;
+      viewer?.setSimulation(false);
+      set({simulation:false});
+    },
     attachViewer: (next) => {
       viewer = next;
-      if (!next) return;
+      if (!next) { set({simulation:false}); return; }
+      next.onSimulationExit = () => get().exitSimulation();
       next.setEditing(get().tool !== "move");
       syncClip();
       syncTool();
