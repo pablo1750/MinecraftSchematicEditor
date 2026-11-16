@@ -3,7 +3,7 @@ import type { Build } from "../core/model";
 import { useStore } from "../store";
 import {
   consultarEstilos, guardarEstilo, eliminarEstilo,
-  type ConstruccionServidor, type EstiloEditor, type EstilosRespuesta,
+  type ConstruccionServidor, type EstilosRespuesta,
 } from "../server/catalog";
 
 interface Props {
