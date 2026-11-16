@@ -52,7 +52,10 @@ export function walkerCollides(build:Build,x:number,y:number,z:number):boolean {
         const block=build.palette[build.at(cx,cy,cz)];
         if(!block || isPassable(block.name))continue;
         const name=baseName(block.name);
-        if(name.endsWith("_door") && block.properties?.open==="true")continue;
+        if((name.endsWith("_door") || name.endsWith("_fence_gate")) &&
+           (block.properties?.open==="true" ||
+            block.properties?.open_bit==="true" ||
+            block.properties?.open_bit==="1"))continue;
         const boxes=lookFor(block).boxes;
         for(const box of boxes){
           if(x+WALK_RADIUS>cx+box[0]+epsilon &&
