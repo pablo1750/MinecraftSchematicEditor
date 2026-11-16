@@ -21,6 +21,7 @@ import {
 } from "../assets/modelResolver";
 import { GRAIN_LAYER, TextureArrayBuilder } from "../assets/textures";
 import { tintFor } from "./tint";
+import { isWater, waterHeight, makeWaterTexture, WATER_TEXTURE_KEY } from "./water";
 
 /** Direction indices used everywhere downstream. */
 export const EAST = 0, WEST = 1, UP = 2, DOWN = 3, SOUTH = 4, NORTH = 5;
@@ -557,6 +558,24 @@ export async function bakePalette(build: Build, pack: ResourcePack | null): Prom
     }
 
     const id = baseName(state.name);
+    if(isWater(state)) {
+      // Fluids are not cuboids. The palette state determines the surface level.
+      // The procedural texture has real alpha regardless of which pack is active.
+      const path=WATER_TEXTURE_KEY;
+      textures.generatedLayer(path,makeWaterTexture());
+      const model=boxModel(path,[[0,0,0,1,waterHeight(state),1]]);
+      const quads:BakedQuad[]=[];
+      const placement:Placement={model,x:0,y:0,uvlock:false};
+      for(const element of model.elements){
+        bakeElement(element,placement,model,textures,[1,1,1],quads);
+      }
+      blocks.push({
+        parts:[[quads]],single:quads,occludes:new Uint8Array(6),
+        layer:2,ao:false,empty:false,fromModel:true,
+      });
+      textured=true;
+      continue;
+    }
     let resolved = pack ? resolveState(pack, state, modelCache) : null;
 
     // Connections depend on each cell's neighbours, not on palette entries.
