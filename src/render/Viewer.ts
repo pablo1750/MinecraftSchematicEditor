@@ -183,7 +183,10 @@ export class Viewer {
   private materials: (THREE.MeshBasicMaterial | THREE.MeshLambertMaterial)[];
   private litMaterials: (THREE.MeshBasicMaterial | THREE.MeshLambertMaterial)[];
   private sun = new THREE.DirectionalLight(0xfff0d6, 1);
-  private sky = new THREE.HemisphereLight(0xe5f2ff, 0x404653, 0.82);
+  // Diffuse ambient fill keeps interior walls legible even when the sun is
+  // occluded by a roof. Minecraft has an ambient baseline beyond direct sun.
+  private sky = new THREE.HemisphereLight(0xfff3e5, 0x9f9183, 1.35);
+  private ambient = new THREE.AmbientLight(0xfff4e8, 0.65);
   private fill = new THREE.PointLight(0xffe9cf, 0.25, 9);
   /** Every emitter in this finite building gets its own local light. */
   private buildingLights: THREE.PointLight[] = [];
@@ -317,6 +320,7 @@ export class Viewer {
     ];
     this.sun.visible = false;
     this.sky.visible = false;
+    this.ambient.visible = false;
     this.fill.visible = false;
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(1024,1024);
@@ -329,7 +333,7 @@ export class Viewer {
     this.sun.shadow.bias = -0.0001;
     this.sun.shadow.normalBias = 0.02;
     this.sun.shadow.radius = 2;
-    this.scene.add(this.sun,this.sun.target,this.sky,this.fill);
+    this.scene.add(this.sun,this.sun.target,this.sky,this.ambient,this.fill);
 
 
     const unitEdges = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
@@ -1565,6 +1569,7 @@ export class Viewer {
       this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       this.sun.visible = true;
       this.sky.visible = true;
+      this.ambient.visible = true;
       this.fill.visible = true;
       this.updateSimulationLighting();
       this.refreshChunkMaterials();
@@ -1611,6 +1616,7 @@ export class Viewer {
       this.renderer.shadowMap.enabled = false;
       this.sun.visible = false;
       this.sky.visible = false;
+      this.ambient.visible = false;
       this.fill.visible = false;
       this.clearBuildingLights();
       this.renderer.setClearColor(0x0d1117,1);
