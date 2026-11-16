@@ -6,10 +6,17 @@ try {
   const {wallTorchElements,loadBedrockPack,prepareBedrockPalette}=
     await server.ssrLoadModule("/src/assets/bedrock.ts");
   const texture="minecraft:block/bedrock/torch_on";
-  const sample={north:[7,3,10],south:[7,3,4],east:[4,3,7],west:[10,3,7]};
+  const sample={north:[7,3,13],south:[7,3,1],east:[1,3,7],west:[13,3,7]};
   for(const [direction,expectedFrom] of Object.entries(sample)){
     const [element]=wallTorchElements(texture,direction);
     assert.deepEqual(element.from,expectedFrom,`wall torch mounted toward ${direction}`);
+    // The bottom of the torch touches the side of its own cell that borders
+    // the supporting wall (not the middle of the cell).
+    const origin=element.rotation.origin;
+    if(direction==="north") assert.equal(origin[2],15);
+    if(direction==="south") assert.equal(origin[2],1);
+    if(direction==="east") assert.equal(origin[0],1);
+    if(direction==="west") assert.equal(origin[0],15);
     assert.equal(Math.abs(element.rotation.angle),22.5);
     assert.ok(["x","z"].includes(element.rotation.axis));
     for(const face of ["north","south","east","west"]){
