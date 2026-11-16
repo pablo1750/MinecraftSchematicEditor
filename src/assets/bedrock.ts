@@ -17,7 +17,15 @@ const aliases:Record<string,string> = {
 async function json<T>(path:string):Promise<T> {
   const response = await fetch(ROOT+"/"+path);
   if (!response.ok) throw new Error(`No se pudo cargar Bedrock: ${path} (HTTP ${response.status})`);
-  return response.json() as Promise<T>;
+  // Mojang's terrain_texture.json includes a leading // reference comment.
+  // Strip only whole-line comments before the JSON document, preserving values.
+  const raw = (await response.text()).replace(/^\uFEFF/, "");
+  const cleaned = raw.replace(/^(?:\s*\/\/[^\r\n]*(?:\r?\n|$))*/, "");
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch (cause) {
+    throw new Error(`Bedrock: ${path} no es JSON válido`, { cause });
+  }
 }
 function textureFile(t:TextureDef | undefined):string | null {
   if (!t) return null;
