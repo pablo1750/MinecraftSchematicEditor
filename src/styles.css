@@ -1854,3 +1854,19 @@ kbd {
 .style-editor-hint { color: var(--mute); font-size: 12px; margin: 0; }
 .style-editor-footer { padding-top: 10px; border-top: 1px solid var(--line); }
 .style-editor-footer p { width: 100%; margin: 0; }
+
+/* Material replacement uses the same BlockPicker as Paint/Replace all.
+   Rendered in document.body to escape the scrollable style panel. */
+.style-picker-host .picker-backdrop { z-index: 100; }
+.style-editor-replacement { display:flex; min-width:0; gap:4px; align-items:center; }
+.style-editor-choose {
+  display:flex; align-items:center; gap:7px; flex:1; min-width:0;
+  padding:7px 8px; text-align:left; cursor:pointer;
+  border:1px solid var(--line); border-radius:5px;
+  background:var(--graphite); color:var(--chalk);
+}
+.style-editor-choose:hover:not(:disabled) { border-color:var(--lapis); }
+.style-editor-choose:disabled { opacity:0.65; cursor:default; }
+.style-editor-choose span { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.style-editor-choose .swatch { flex-shrink:0; }
+.style-editor-clear { flex-shrink:0; padding:6px 9px; }
