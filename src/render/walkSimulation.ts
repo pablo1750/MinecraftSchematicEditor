@@ -16,6 +16,7 @@ export interface Walker {
 }
 export interface WalkInput {
   forward:number; right:number; yaw:number; jump:boolean; sprint:boolean;
+  flying?:boolean; descend?:boolean;
 }
 
 /** Decorations, liquids and foliage don't stop the simulated character. */
@@ -105,9 +106,18 @@ export function advanceWalker(build:Build,body:Walker,keys:WalkInput,dt:number):
   const r=length?right/length:0;
   const dx=(Math.cos(keys.yaw)*r+Math.sin(keys.yaw)*f)*speed*dt;
   const dz=(-Math.sin(keys.yaw)*r+Math.cos(keys.yaw)*f)*speed*dt;
-  if(next.grounded && keys.jump){next.vy=JUMP_SPEED;next.grounded=false;}
-  next.vy=Math.max(-35,next.vy-WALK_GRAVITY*dt);
-  const dy=next.vy*dt;
+  if(keys.flying){
+    // Creative flight is velocity-free: release the controls to hover.
+    // Collision sweeps still apply in every direction.
+    next.vy=0;
+    next.grounded=false;
+  }else{
+    if(next.grounded && keys.jump){next.vy=JUMP_SPEED;next.grounded=false;}
+    next.vy=Math.max(-35,next.vy-WALK_GRAVITY*dt);
+  }
+  const dy=keys.flying
+    ? (Number(keys.jump)-Number(keys.descend))*speed*dt
+    : next.vy*dt;
   const steps=Math.max(1,Math.ceil(Math.max(Math.abs(dx),Math.abs(dz),Math.abs(dy))/.10));
   for(let i=0;i<steps;i++){
     for(const [axis,movement] of [["x",dx/steps],["z",dz/steps]] as const){
@@ -116,7 +126,7 @@ export function advanceWalker(build:Build,body:Walker,keys:WalkInput,dt:number):
       const nextZ=next.z+(axis==="z"?movement:0);
       if(!walkerCollides(build,nextX,next.y,nextZ)) {
         next[axis]+=movement;
-      } else if (next.grounded) {
+      } else if (next.grounded && !keys.flying) {
         // Minecraft-like auto-step over slabs and the lower half of stairs.
         // A full block is taller than 0.6 and remains impassable.
         for(let lift=.1;lift<=.61;lift+=.1){
@@ -132,14 +142,14 @@ export function advanceWalker(build:Build,body:Walker,keys:WalkInput,dt:number):
     }
     const y=next.y+dy/steps;
     if(walkerCollides(build,next.x,y,next.z)){
-      if(next.vy<0)next.grounded=true;
+      if(!keys.flying && next.vy<0)next.grounded=true;
       next.vy=0;
     }else{
       next.y=y;
       next.grounded=false;
     }
   }
-  if(!next.grounded && next.vy<=0 &&
+  if(!keys.flying && !next.grounded && next.vy<=0 &&
     walkerCollides(build,next.x,next.y-.025,next.z)){
     next.grounded=true;next.vy=0;
   }
