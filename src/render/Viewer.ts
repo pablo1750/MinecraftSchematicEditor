@@ -9,7 +9,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { type Build } from "../core/model";
 import { toggleDoorAt } from "./doorInteraction";
-import { collectBlockLights, nearestBlockLights, type BlockLight } from "./emissiveLights";
+import { collectBlockLights } from "./emissiveLights";
 import type { BrushShape } from "../core/brush";
 import { mirrorImages, planePosition, type MirrorConfig } from "../core/mirror";
 import { meshRegion, type MeshData } from "./mesher";
@@ -185,10 +185,8 @@ export class Viewer {
   private sun = new THREE.DirectionalLight(0xfff0d6, 1);
   private sky = new THREE.HemisphereLight(0xe5f2ff, 0x404653, 0.82);
   private fill = new THREE.PointLight(0xffe9cf, 0.25, 9);
-  private emittedLights: BlockLight[] = [];
-  private nearbyLights: THREE.PointLight[] = Array.from({length:8},()=>new THREE.PointLight(0xffca7b,0,10,2));
-  private lastLightCell = "";
-  private lastLightUpdate = 0;
+  /** Every emitter in this finite building gets its own local light. */
+  private buildingLights: THREE.PointLight[] = [];
   private simulationOriginalBuild: Build | null = null;
   private simulationOriginalBaked: BakedPalette | null = null;
   private simulationFog: THREE.Fog | THREE.FogExp2 | null = null;
@@ -332,11 +330,7 @@ export class Viewer {
     this.sun.shadow.normalBias = 0.02;
     this.sun.shadow.radius = 2;
     this.scene.add(this.sun,this.sun.target,this.sky,this.fill);
-    for(const light of this.nearbyLights){
-      light.visible=false;
-      light.castShadow=false; // point shadows cost 6 shadow maps per light
-      this.scene.add(light);
-    }
+
 
     const unitEdges = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
     this.hoverBox = new THREE.LineSegments(
@@ -1553,10 +1547,17 @@ export class Viewer {
       this.simulationOriginalBuild = this.build;
       this.simulationOriginalBaked = this.baked;
       this.build = this.build!.clone();
-      this.emittedLights=collectBlockLights(this.build);
-      for(const light of this.nearbyLights){light.visible=true;light.intensity=0;}
-      this.lastLightCell="";
-      this.lastLightUpdate=0;
+      // Small self-contained builds: illuminate *all* active sources, not
+      // just those near the character. Point shadows remain off: each would
+      // require six shadow passes and quickly overwhelm WebGL.
+      this.clearBuildingLights();
+      this.buildingLights = collectBlockLights(this.build).map(source => {
+        const light = new THREE.PointLight(source.color, source.intensity, source.radius, 2);
+        light.position.set(source.x, source.y, source.z);
+        light.castShadow = false;
+        this.scene.add(light);
+        return light;
+      });
       this.simulationFog = this.scene.fog as THREE.Fog | THREE.FogExp2 | null;
       this.renderer.setClearColor(0xa4b9ca,1);
       this.scene.fog = new THREE.Fog(0xa4b9ca,55,125);
@@ -1611,9 +1612,7 @@ export class Viewer {
       this.sun.visible = false;
       this.sky.visible = false;
       this.fill.visible = false;
-      for(const light of this.nearbyLights)light.visible=false;
-      this.emittedLights=[];
-      this.lastLightCell="";
+      this.clearBuildingLights();
       this.renderer.setClearColor(0x0d1117,1);
       this.scene.fog = this.simulationFog;
       this.simulationFog = null;
@@ -1669,6 +1668,14 @@ export class Viewer {
     }
   }
 
+  private clearBuildingLights(){
+    for(const light of this.buildingLights){
+      this.scene.remove(light);
+      light.dispose();
+    }
+    this.buildingLights=[];
+  }
+
   private updateSimulationLighting(){
     if(!this.simulation || !this.walkBody)return;
     const p=this.walkBody;
@@ -1676,24 +1683,6 @@ export class Viewer {
     this.sun.target.position.set(p.x,p.y,p.z);
     this.sun.target.updateMatrixWorld();
     this.fill.position.copy(this.camera.position);
-    // Moving lights every frame is unnecessary and recompiles shaders when the
-    // light count changes. Keep exactly eight fixed lights, update nearby
-    // emitters when the player crosses a voxel or after a short interval.
-    const cell=`${Math.floor(p.x)}:${Math.floor(p.y)}:${Math.floor(p.z)}`;
-    const now=performance.now();
-    if(cell===this.lastLightCell && now-this.lastLightUpdate<700)return;
-    this.lastLightCell=cell;
-    this.lastLightUpdate=now;
-    const nearest=nearestBlockLights(this.emittedLights,p.x,p.y+WALK_EYE_HEIGHT,p.z,this.nearbyLights.length);
-    for(let i=0;i<this.nearbyLights.length;i++){
-      const target=this.nearbyLights[i];
-      const source=nearest[i];
-      if(!source){target.intensity=0;continue;}
-      target.position.set(source.x,source.y,source.z);
-      target.color.setHex(source.color);
-      target.intensity=source.intensity;
-      target.distance=source.radius;
-    }
   }
 
   /** E or right click: raycast from the crosshair, never through a wall. */
