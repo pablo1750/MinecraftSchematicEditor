@@ -531,11 +531,69 @@ function StageHud() {
   );
 }
 
+type PhotoPreset = {id:string; name:string; settings: import("./render/Viewer").PhotoSettings};
+const PHOTO_PRESETS_KEY="minecraft-editor-photo-presets-v1";
+
+function readPhotoPresets():PhotoPreset[] {
+  try {
+    const stored=localStorage.getItem(PHOTO_PRESETS_KEY);
+    if(!stored)return [];
+    const data:unknown=JSON.parse(stored);
+    if(!Array.isArray(data))return [];
+    return data.filter((item):item is PhotoPreset=>
+      !!item && typeof item==="object" &&
+      typeof item.id==="string" && typeof item.name==="string" &&
+      !!item.settings && typeof item.settings==="object");
+  }catch{return [];}
+}
+
 function PhotoPanel() {
-  const settings=useStore((s)=>s.photoSettings);
+  const settings=useStore((state)=>state.photoSettings);
   const [hidden,setHidden]=useState(false);
+  const [presets,setPresets]=useState<PhotoPreset[]>(readPhotoPresets);
+  const [presetName,setPresetName]=useState("");
+  const [selected,setSelected]=useState("");
+  const [message,setMessage]=useState("");
   const change=(key:keyof typeof settings,value:number)=>
     useStore.getState().updatePhotoSettings({...settings,[key]:value});
+  const persist=(next:PhotoPreset[])=>{
+    try{
+      localStorage.setItem(PHOTO_PRESETS_KEY,JSON.stringify(next));
+      setPresets(next);
+      setMessage("");
+      return true;
+    }catch{
+      setMessage("No se pudieron guardar los presets en este navegador.");
+      return false;
+    }
+  };
+  const savePreset=()=>{
+    const name=presetName.trim();
+    if(!name){setMessage("Escribí un nombre para el preset.");return;}
+    const existing=presets.find((item)=>item.name.toLowerCase()===name.toLowerCase());
+    const id=existing?.id??("photo-"+Date.now()+"-"+Math.random().toString(36).slice(2));
+    const next=existing
+      ? presets.map(item=>item.id===id?{id,name,settings:{...settings}}:item)
+      : [...presets,{id,name,settings:{...settings}}];
+    if(persist(next)){setSelected(id);setPresetName("");}
+  };
+  const loadPreset=(id:string)=>{
+    setSelected(id);
+    const preset=presets.find(item=>item.id===id);
+    if(preset){
+      // Preserve compatibility with presets saved before new photo controls exist.
+      useStore.getState().updatePhotoSettings({...settings,...preset.settings});
+      setPresetName(preset.name);
+      setMessage("");
+    }
+  };
+  const deletePreset=()=>{
+    if(!selected)return;
+    if(persist(presets.filter(item=>item.id!==selected))){
+      setSelected("");
+      setPresetName("");
+    }
+  };
   const capture=()=>{
     const url=useStore.getState().takePhotoPng();
     if(!url)return;
@@ -549,14 +607,31 @@ function PhotoPanel() {
       <div className="photo-heading"><strong>Modo foto</strong>
         <button className="btn" onClick={()=>useStore.getState().exitSimulation()}>Salir</button></div>
       <p>WASD mover · Espacio subir · Shift bajar · Ctrl rápido · Clic para mirar · Esc libera mouse</p>
+      <div className="photo-presets">
+        <strong>Mis presets</strong>
+        <select aria-label="Seleccionar preset" value={selected} onChange={e=>loadPreset(e.target.value)}>
+          <option value="">Seleccionar preset guardado</option>
+          {presets.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+        <input aria-label="Nombre del preset" type="text" maxLength={60}
+          placeholder="Nombre para guardar" value={presetName}
+          onChange={event=>setPresetName(event.target.value)}
+          onKeyDown={event=>event.stopPropagation()}/>
+        <div className="photo-actions">
+          <button className="btn btn-primary" onClick={savePreset}>Guardar configuración</button>
+          <button className="btn" disabled={!selected} onClick={deletePreset}>Eliminar</button>
+        </div>
+        {message && <small role="alert">{message}</small>}
+      </div>
       {([
-        ["hour","Hora",0,24,1],["sunlight","Sol",0,3,.1],["ambient","Ambiente",0,3,.1],
-        ["lamps","Luces artificiales",0,4,.1],["fog","Niebla",0,2,.1],
-        ["fov","Campo visual",30,110,1],["speed","Velocidad",2,60,1],
+        ["hour","Hora",0,24,.5],["sunlight","Sol",0,3,.1],["ambient","Ambiente",0,3,.1],
+        ["lamps","Luces artificiales",0,4,.1],["lampReach","Alcance de luces",.5,2.5,.1],
+        ["exposure","Exposición",.3,2.5,.1],["bloom","Resplandor",0,1.5,.05],
+        ["fog","Niebla",0,2,.1],["fov","Campo visual",30,110,1],["speed","Velocidad",2,60,1],
       ] as const).map(([key,label,min,max,step])=>
         <label key={key} className="photo-setting"><span>{label} <b>{settings[key]}</b></span>
           <input type="range" min={min} max={max} step={step} value={settings[key]}
-            onChange={(event)=>change(key,Number(event.target.value))}/></label>)}
+            onChange={event=>change(key,Number(event.target.value))}/></label>)}
       <div className="photo-actions">
         <button className="btn btn-primary" onClick={capture}>Capturar PNG</button>
         <button className="btn" onClick={()=>setHidden(true)}>Ocultar panel</button>
