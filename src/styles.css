@@ -1954,3 +1954,13 @@ kbd {
   .mark-text {display:none;}
   .topbar-menu > .btn {padding-inline:6px;}
 }
+
+/* Compact photo action bar: three icon-only buttons with native hover tooltips. */
+.photo-actions-icons { justify-content:flex-end; gap:6px; }
+.photo-icon-button {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:34px; height:32px; min-width:34px; padding:0;
+}
+.photo-panel:has(> .photo-icon-button) {
+  width:auto; padding:7px;
+}
