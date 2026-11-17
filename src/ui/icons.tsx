@@ -217,3 +217,14 @@ export const Mark = ({ size = 18 }: Props) => (
     <path d="M10 10.2v7.2" stroke="#4c7ff0" strokeWidth="1.2" opacity=".55" />
   </svg>
 );
+
+/** Contraer o expandir el panel de ajustes del modo foto. */
+export const IconPanelCollapse = ({ size = 16, expanded = true }: Props & { expanded?: boolean }) => (
+  <svg {...base(size)}>
+    <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
+    <path d="M2 5.4h12" opacity=".5" />
+    {expanded
+      ? <path d="M5.3 10.3 8 7.7l2.7 2.6" />
+      : <path d="M5.3 7.7 8 10.3l2.7-2.6" />}
+  </svg>
+);
