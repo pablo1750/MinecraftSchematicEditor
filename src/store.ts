@@ -1532,7 +1532,7 @@ export const useStore = create<State & Actions>((set, get) => {
     styleWritable: false,
     simulation: false,
     photoMode: false,
-    photoSettings: {hour:20,sunlight:1,ambient:1,lamps:1.5,fog:0,fov:65,speed:12},
+    photoSettings: {hour:20,sunlight:1,ambient:1,lamps:1.5,fog:0,fov:65,speed:12,exposure:1,bloom:.3,lampReach:1},
     notice: null,
 
     tool: "move",
