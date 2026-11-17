@@ -11,7 +11,7 @@ import { StatusBar } from "./ui/StatusBar";
 import { LayerSlider } from "./ui/LayerSlider";
 import { EmptyState } from "./ui/EmptyState";
 import { ServerProperties, type ServerPropertiesHandle } from "./ui/ServerProperties";
-import type { ConstruccionServidor, ModoGuardar } from "./server/catalog";
+import { guardarImagenConstruccion, type ConstruccionServidor, type ModoGuardar } from "./server/catalog";
 import { Hotbar } from "./ui/Hotbar";
 import { StyleEditor } from "./ui/StyleEditor";
 
@@ -70,6 +70,7 @@ export default function App() {
   // evita que un segundo Guardar genere una duplicación en el catálogo.
   const savedBuildRef = useRef<typeof build>(null);
   const [propertiesVisible, setPropertiesVisible] = useState(false);
+  const [pendingCover, setPendingCover] = useState<{id:number;blob:Blob}|null>(null);
   const [stylesVisible, setStylesVisible] = useState(false);
   const sourceIsCurrent = serverSource !== null && build !== null &&
     ((serverLoadedFile !== null && fileName === serverLoadedFile) || savedBuildRef.current === build);
@@ -290,7 +291,22 @@ export default function App() {
 
       <main className="stage">
         <Viewport />
-        {photoMode && <PhotoPanel />}
+        {photoMode && <PhotoPanel onSaveCover={async ()=>{
+          const dataUrl=useStore.getState().takePhotoPng();
+          if(!dataUrl) throw new Error("No se pudo capturar la imagen.");
+          const blob=await (await fetch(dataUrl)).blob();
+          if(!blob.size) throw new Error("La captura quedó vacía.");
+          if(sourceIsCurrent && serverSource && serverMode==="editar"){
+            const updated=await guardarImagenConstruccion(serverSource,blob);
+            setServerSource(updated);
+            useStore.getState().setNotice("Imagen de portada actualizada.");
+            return "Portada guardada sin modificar la construcción.";
+          }
+          setPendingCover({id:Date.now(),blob});
+          setPropertiesVisible(true);
+          useStore.getState().exitSimulation();
+          return "Captura enviada a Propiedades. Guardá la construcción para publicarla.";
+        }} />}
         {stylesVisible && sourceIsCurrent && serverSource && build && serverMode==="editar" &&
           <StyleEditor key={serverSource.categoria+"/"+serverSource.id}
             source={serverSource} build={build}
@@ -301,6 +317,7 @@ export default function App() {
         onClose={() => setPropertiesVisible(false)}
         onRequireDetails={() => setPropertiesVisible(true)}
         source={sourceIsCurrent ? serverSource : null}
+        pendingCover={pendingCover}
         mode={sourceIsCurrent ? serverMode : "nueva"}
         onSaved={(entry) => {
           savedBuildRef.current = build;
@@ -547,13 +564,14 @@ function readPhotoPresets():PhotoPreset[] {
   }catch{return [];}
 }
 
-function PhotoPanel() {
+function PhotoPanel({onSaveCover}:{onSaveCover:()=>Promise<string>}) {
   const settings=useStore((state)=>state.photoSettings);
   const [hidden,setHidden]=useState(false);
   const [presets,setPresets]=useState<PhotoPreset[]>(readPhotoPresets);
   const [presetName,setPresetName]=useState("");
   const [selected,setSelected]=useState("");
   const [message,setMessage]=useState("");
+  const [savingCover,setSavingCover]=useState(false);
   const change=(key:keyof typeof settings,value:number)=>
     useStore.getState().updatePhotoSettings({...settings,[key]:value});
   const persist=(next:PhotoPreset[])=>{
@@ -593,6 +611,14 @@ function PhotoPanel() {
       setSelected("");
       setPresetName("");
     }
+  };
+  const saveCover=async()=>{
+    if(savingCover)return;
+    setSavingCover(true);
+    setMessage("");
+    try{setMessage(await onSaveCover());}
+    catch(cause){setMessage(cause instanceof Error?cause.message:String(cause));}
+    finally{setSavingCover(false);}
   };
   const capture=()=>{
     const url=useStore.getState().takePhotoPng();
@@ -634,8 +660,12 @@ function PhotoPanel() {
             onChange={event=>change(key,Number(event.target.value))}/></label>)}
       <div className="photo-actions">
         <button className="btn btn-primary" onClick={capture}>Capturar PNG</button>
+        <button className="btn" disabled={savingCover} onClick={()=>void saveCover()}>
+          {savingCover?"Guardando foto…":"Guardar foto en construcción"}
+        </button>
         <button className="btn" onClick={()=>setHidden(true)}>Ocultar panel</button>
       </div>
+      {message && <p role="status">{message}</p>}
     </>}
   </div>;
 }
