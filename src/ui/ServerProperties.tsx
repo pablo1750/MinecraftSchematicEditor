@@ -12,11 +12,12 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   source: ConstruccionServidor | null;
+  pendingCover?: {id:number;blob:Blob}|null;
   mode: ModoGuardar;
   onSaved: (entry: ConstruccionServidor) => void;
 }
 
-export function ServerProperties({ ref, onRequireDetails, source, mode, onSaved, visible, onClose }: Props) {
+export function ServerProperties({ ref, onRequireDetails, source, pendingCover, mode, onSaved, visible, onClose }: Props) {
   const build = useStore((s) => s.build);
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -37,6 +38,13 @@ export function ServerProperties({ ref, onRequireDetails, source, mode, onSaved,
     setMessage("");
     setError("");
   }, [source?.id, source?.categoria, mode, build]);
+
+  useEffect(() => {
+    if(!pendingCover)return;
+    setPhoto(pendingCover.blob);
+    setMessage("Captura recibida desde el modo foto. Guardá la construcción para publicar la portada.");
+    setError("");
+  },[pendingCover?.id]);
 
   useEffect(() => {
     if (!photo) return;
