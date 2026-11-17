@@ -6,6 +6,10 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { CSS2DObject, CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { type Build } from "../core/model";
 import { toggleDoorAt } from "./doorInteraction";
@@ -155,6 +159,7 @@ function ringGeometry(radius: number, segments = 48): THREE.BufferGeometry {
 
 export interface PhotoSettings {
   hour:number; sunlight:number; ambient:number; lamps:number; fog:number; fov:number; speed:number;
+  exposure:number; bloom:number; lampReach:number;
 }
 export class Viewer {
   readonly scene = new THREE.Scene();
@@ -169,8 +174,13 @@ export class Viewer {
     return this.renderer.domElement.toDataURL("image/webp", 0.88);
   }
 
+  private renderPhotoFrame() {
+    if(this.photoMode && this.photoComposer && this.photoSettings.bloom>0)
+      this.photoComposer.render();
+    else this.renderer.render(this.scene,this.camera);
+  }
   takePhotoPng(): string {
-    this.renderer.render(this.scene,this.camera);
+    this.renderPhotoFrame();
     return this.renderer.domElement.toDataURL("image/png");
   }
   setPhotoSettings(settings:PhotoSettings) {
@@ -183,16 +193,23 @@ export class Viewer {
   private applyPhotoLighting() {
     if(!this.photoMode)return;
     const s=this.photoSettings;
-    const daylight=Math.max(0,Math.sin((s.hour-6)*Math.PI/12));
-    const dusk=Math.max(0,1-Math.abs(s.hour-19)/3);
+    // Broad daylight and a short twilight interval around sunrise/sunset.
+    const daylight=Math.max(0,Math.min(1,(s.hour-5.5)/2,(20-s.hour)/2));
+    const dusk=Math.max(0,1-Math.min(Math.abs(s.hour-6),Math.abs(s.hour-19))/2.2);
     const sky=new THREE.Color().setRGB(
       .025+daylight*.63+dusk*.16,.035+daylight*.72+dusk*.065,.09+daylight*.75+dusk*.015);
     this.renderer.setClearColor(sky,1);
+    this.renderer.toneMapping=THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure=s.exposure;
+    if(this.bloomPass)this.bloomPass.strength=s.bloom;
     this.sun.intensity=s.sunlight*daylight;
     this.sky.intensity=s.ambient*(.3+1.05*daylight);
     this.ambient.intensity=s.ambient*(.14+.51*daylight);
     this.fill.intensity=s.ambient*.25;
-    this.buildingLights.forEach((lamp,i)=>{lamp.intensity=this.photoLampIntensities[i]*s.lamps;});
+    this.buildingLights.forEach((lamp,i)=>{
+      lamp.intensity=this.photoLampIntensities[i]*s.lamps;
+      lamp.distance=this.photoLampRadii[i]*s.lampReach;
+    });
     this.scene.fog=s.fog>0?new THREE.Fog(sky,25/s.fog,160/s.fog):null;
   }
 
@@ -233,6 +250,9 @@ export class Viewer {
   /** Every emitter in this finite building gets its own local light. */
   private buildingLights: THREE.PointLight[] = [];
   private photoLampIntensities: number[] = [];
+  private photoLampRadii: number[] = [];
+  private photoComposer: EffectComposer | null = null;
+  private bloomPass: UnrealBloomPass | null = null;
   private simulationOriginalBuild: Build | null = null;
   private simulationOriginalBaked: BakedPalette | null = null;
   private simulationFog: THREE.Fog | THREE.FogExp2 | null = null;
@@ -306,7 +326,7 @@ export class Viewer {
   private walkKeys = new Set<string>();
   private walkFlying = false;
   private photoMode = false;
-  private photoSettings: PhotoSettings = {hour:20,sunlight:1,ambient:1,lamps:1.5,fog:0,fov:65,speed:12};
+  private photoSettings: PhotoSettings = {hour:20,sunlight:1,ambient:1,lamps:1.5,fog:0,fov:65,speed:12,exposure:1,bloom:0.3,lampReach:1};
   private lastSpacePress = -Infinity;
   private suppressSpaceUntilRelease = false;
   private lastFrameTime = 0;
@@ -489,6 +509,7 @@ export class Viewer {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
+    this.photoComposer?.setSize(w,h);
     this.labelRenderer.setSize(w, h);
   }
 
@@ -502,6 +523,8 @@ export class Viewer {
     this.controls.dispose();
     for(const material of [...this.materials,...this.litMaterials])material.dispose();
     this.sun.shadow.dispose();
+    this.photoComposer?.dispose();
+    this.photoComposer=null;
     this.renderer.dispose();
     this.renderer.domElement.remove();
     this.labelRenderer.domElement.remove();
@@ -1632,6 +1655,7 @@ export class Viewer {
       this.clearBuildingLights();
       const lightSources=collectBlockLights(this.build);
       this.photoLampIntensities=lightSources.map(source=>source.intensity);
+      this.photoLampRadii=lightSources.map(source=>source.radius);
       this.buildingLights = lightSources.map(source => {
         const light = new THREE.PointLight(source.color, source.intensity, source.radius, 2);
         light.position.set(source.x, source.y, source.z);
@@ -1664,6 +1688,13 @@ export class Viewer {
       const heading = new THREE.Euler().setFromQuaternion(this.camera.quaternion,"YXZ");
       this.camera.quaternion.setFromEuler(new THREE.Euler(0,heading.y,0,"YXZ"));
       if(photo){
+        const size=new THREE.Vector2(this.renderer.domElement.width,this.renderer.domElement.height);
+        this.photoComposer?.dispose();
+        this.photoComposer=new EffectComposer(this.renderer);
+        this.photoComposer.addPass(new RenderPass(this.scene,this.camera));
+        this.bloomPass=new UnrealBloomPass(size,0.3,0.35,0.8);
+        this.photoComposer.addPass(this.bloomPass);
+        this.photoComposer.addPass(new OutputPass());
         const centre=new THREE.Vector3(build.width/2,build.height/2,build.length/2);
         const distance=Math.max(build.width,build.height,build.length)*1.45+8;
         this.camera.position.set(centre.x+distance*.7,centre.y+distance*.42,centre.z+distance*.7);
@@ -1712,6 +1743,12 @@ export class Viewer {
       this.ambient.intensity=.65;
       this.fill.intensity=.25;
       this.photoLampIntensities=[];
+      this.photoLampRadii=[];
+      this.photoComposer?.dispose();
+      this.photoComposer=null;
+      this.bloomPass=null;
+      this.renderer.toneMapping=THREE.NoToneMapping;
+      this.renderer.toneMappingExposure=1;
       this.renderer.shadowMap.enabled = false;
       this.sun.visible = false;
       this.sky.visible = false;
@@ -2161,7 +2198,7 @@ export class Viewer {
     }
 
     this.waterTime.value = performance.now() * 0.001;
-    this.renderer.render(this.scene, this.camera);
+    this.renderPhotoFrame();
     this.labelRenderer.render(this.scene, this.camera);
   };
 }
