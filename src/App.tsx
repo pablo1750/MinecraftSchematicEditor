@@ -3,6 +3,7 @@ import { useLocale, translate } from "./i18n";
 import { useStore, type Tool } from "./store";
 import { MIRROR_AXES, mirrorActive, mirrorCopies } from "./core/mirror";
 import { Viewport } from "./ui/Viewport";
+import { IconDownload, IconSave, IconPanelCollapse } from "./ui/icons";
 import { TopBar } from "./ui/TopBar";
 import { DocTabs } from "./ui/DocTabs";
 import { ToolRail } from "./ui/ToolRail";
@@ -629,7 +630,11 @@ function PhotoPanel({onSaveCover}:{onSaveCover:()=>Promise<string>}) {
     link.click();
   };
   return <div className="photo-panel">
-    {hidden ? <button className="btn btn-primary" onClick={()=>setHidden(false)}>Mostrar controles</button> : <>
+    {hidden ? <button type="button" className="btn photo-icon-button" onClick={()=>setHidden(false)}
+      title="Expandir el panel de ajustes del modo foto"
+      aria-label="Expandir el panel de ajustes del modo foto">
+      <IconPanelCollapse expanded={false} />
+    </button> : <>
       <div className="photo-heading"><strong>Modo foto</strong>
         <button className="btn" onClick={()=>useStore.getState().exitSimulation()}>Salir</button></div>
       <p>WASD mover · Espacio subir · Shift bajar · Ctrl rápido · Clic para mirar · Esc libera mouse</p>
@@ -658,12 +663,23 @@ function PhotoPanel({onSaveCover}:{onSaveCover:()=>Promise<string>}) {
         <label key={key} className="photo-setting"><span>{label} <b>{settings[key]}</b></span>
           <input type="range" min={min} max={max} step={step} value={settings[key]}
             onChange={event=>change(key,Number(event.target.value))}/></label>)}
-      <div className="photo-actions">
-        <button className="btn btn-primary" onClick={capture}>Capturar PNG</button>
-        <button className="btn" disabled={savingCover} onClick={()=>void saveCover()}>
-          {savingCover?"Guardando foto…":"Guardar foto en construcción"}
+      <div className="photo-actions photo-actions-icons">
+        <button type="button" className="btn btn-primary photo-icon-button" onClick={capture}
+          title="Exportar una captura PNG de la vista actual a tu dispositivo, sin los controles del editor"
+          aria-label="Exportar captura PNG">
+          <IconDownload />
         </button>
-        <button className="btn" onClick={()=>setHidden(true)}>Ocultar panel</button>
+        <button type="button" className="btn photo-icon-button" disabled={savingCover}
+          onClick={()=>void saveCover()}
+          title="Guardar esta foto como imagen de portada de la construcción, sin modificar sus bloques ni sus estilos"
+          aria-label={savingCover?"Guardando foto en construcción":"Guardar foto en construcción"}>
+          <IconSave />
+        </button>
+        <button type="button" className="btn photo-icon-button" onClick={()=>setHidden(true)}
+          title="Contraer el panel de modo foto para dejar más espacio a la vista de la construcción"
+          aria-label="Contraer panel de modo foto">
+          <IconPanelCollapse expanded />
+        </button>
       </div>
       {message && <p role="status">{message}</p>}
     </>}
