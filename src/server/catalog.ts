@@ -110,6 +110,26 @@ export async function guardarConstruccion(
   return body.data;
 }
 
+/** Update only the catalog cover image: no schem, metadata or style changes. 
+ * Requires the server's editor_imagen_guardar action.
+ */
+export async function guardarImagenConstruccion(
+  source: ConstruccionServidor,
+  photo: Blob,
+): Promise<ConstruccionServidor> {
+  const form=new FormData();
+  form.set("categoria",source.categoria);
+  form.set("id_construccion",source.id);
+  form.set("imagen",photo,"photo.png");
+  const response=await fetch("/api/construcciones?accion=editor_imagen_guardar",{
+    method:"POST",body:form,credentials:"same-origin",
+  });
+  await assertResponse(response);
+  const body=await response.json() as {ok:boolean;data?:ConstruccionServidor;error?:string};
+  if(!body.ok || !body.data) throw new Error(body.error??"No se pudo actualizar la imagen.");
+  return body.data;
+}
+
 export interface EstiloEditor {
   id: string;
   nombre: string;
