@@ -1908,3 +1908,11 @@ kbd {
 .photo-setting {display:flex;flex-direction:column;gap:4px;}
 .photo-setting span {display:flex;justify-content:space-between;}
 .photo-setting input {width:100%;accent-color:var(--lapis);}
+
+.photo-panel {max-height:calc(100vh - 40px);overflow-y:auto;}
+.photo-presets {display:flex;flex-direction:column;gap:7px;border-bottom:1px solid var(--line);padding-bottom:10px;}
+.photo-presets select,.photo-presets input {
+  min-width:0;width:100%;padding:7px;border:1px solid var(--line);
+  border-radius:5px;background:var(--graphite);color:var(--chalk);
+}
+.photo-presets small {color:#eec47a;}
